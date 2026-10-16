@@ -91,5 +91,5 @@ historia en "Nosotros", datos bancarios y contacto son de ejemplo.
 - Pasarela real: implementa `IPaymentGateway` (Stripe, Mercado Pago, Webpay, PayPal) con tokenización en el navegador y
   registra la implementación en `Program.cs` en lugar de `MockPaymentGateway`; confirma pagos con webhooks.
 
-![Uploading image.png…]()
+  <img width="1087" height="862" alt="image" src="https://github.com/user-attachments/assets/914efc1e-731d-4ad2-a4ac-0218a521025f" />
 
