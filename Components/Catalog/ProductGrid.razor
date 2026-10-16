@@ -1,0 +1,36 @@
+@if (Loading && (Products is null || Products.Count == 0))
+{
+    <div class="product-grid @(FourColumns ? "product-grid--4" : null)" role="status" aria-label="Cargando productos">
+        @for (var i = 0; i < SkeletonCount; i++)
+        {
+            <ProductCardSkeleton />
+        }
+    </div>
+}
+else if (Products is { Count: > 0 })
+{
+    <ul role="list" class="product-grid @(FourColumns ? "product-grid--4" : null)" aria-label="@Label">
+        @for (var i = 0; i < Products.Count; i++)
+        {
+            var product = Products[i];
+            <li @key="product.Id" style="display:flex;min-width:0">
+                <ProductCard Product="product" Priority="i < PriorityCount" HeadingLevel="HeadingLevel" />
+            </li>
+        }
+    </ul>
+}
+else if (Empty is not null)
+{
+    @Empty
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ProductCardDto>? Products { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public int SkeletonCount { get; set; } = 6;
+    [Parameter] public bool FourColumns { get; set; }
+    [Parameter] public int PriorityCount { get; set; }
+    [Parameter] public int HeadingLevel { get; set; } = 3;
+    [Parameter] public string Label { get; set; } = "Productos";
+    [Parameter] public RenderFragment? Empty { get; set; }
+}

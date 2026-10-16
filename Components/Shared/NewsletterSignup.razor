@@ -1,0 +1,59 @@
+@inject INewsletterService Newsletter
+
+@if (AssignedRenderMode is null)
+{
+    @* Página estática (ingreso/registro): sin circuito interactivo, se enlaza al formulario del inicio. *@
+    <AppButton Variant="@(Dark ? "light" : "primary")" Href="/#newsletter" IconEnd="arrow-right">Quiero suscribirme</AppButton>
+}
+else if (_done)
+{
+    <p class="newsletter-success" role="status">
+        <Icon Name="check-circle" /> ¡Listo! Te escribiremos con novedades y cuidados de temporada.
+    </p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="SubmitAsync" class="@($"newsletter-form {(Dark ? "newsletter-form--dark" : null)}")">
+        <DataAnnotationsValidator />
+        <div class="field">
+            <label class="visually-hidden" for="@_inputId">Correo electrónico</label>
+            <InputText id="@_inputId" type="email" @bind-Value="_model.Email" placeholder="tu@correo.cl" autocomplete="email" />
+            <ValidationMessage For="() => _model.Email" />
+        </div>
+        <AppButton Type="submit" Variant="@(Dark ? "light" : "primary")" Loading="_busy" LoadingText="Enviando…">Suscribirme</AppButton>
+    </EditForm>
+    @if (_error is not null)
+    {
+        <p class="validation-message" role="alert">@_error</p>
+    }
+}
+
+@code {
+    private readonly string _inputId = $"nl-{Guid.NewGuid():N}"[..11];
+    private NewsletterForm _model = new();
+    private bool _busy;
+    private bool _done;
+    private string? _error;
+
+    [Parameter] public bool Dark { get; set; }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var result = await Newsletter.SubscribeAsync(_model.Email);
+            _done = result.Success;
+            _error = result.Error;
+        }
+        catch (Exception)
+        {
+            _error = "No pudimos registrar tu correo. Inténtalo nuevamente.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

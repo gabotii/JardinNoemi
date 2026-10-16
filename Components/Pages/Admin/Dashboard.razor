@@ -1,0 +1,92 @@
+@page "/admin"
+@inject IAdminOrderService AdminOrders
+
+<AdminPageHeader Title="Resumen" Subtitle="Así va el jardín en los últimos 30 días.">
+    <Actions>
+        <AppButton Href="/admin/productos/nuevo" IconStart="plus" Size="sm">Nuevo producto</AppButton>
+    </Actions>
+</AdminPageHeader>
+
+<div class="admin-content">
+    @if (_stats is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else
+    {
+        <div class="stat-grid">
+            <StatCard Label="Ventas pagadas" Icon="receipt" Value="@_stats.RevenueLast30Days.ToMoney()" Hint="Últimos 30 días" />
+            <StatCard Label="Pedidos" Icon="package" Value="@_stats.OrdersLast30Days.ToString()" Hint="Últimos 30 días (sin cancelados)" />
+            <StatCard Label="Por gestionar" Icon="clock" Value="@_stats.PendingOrders.ToString()" Hint="Pendientes, confirmados o en preparación" Alert="_stats.PendingOrders > 0" />
+            <StatCard Label="Stock bajo" Icon="warehouse" Value="@_stats.LowStockProducts.ToString()" Hint="@_stats.OutOfStockProducts.Pluralize("agotado", "agotados")" Alert="_stats.OutOfStockProducts > 0" />
+            <StatCard Label="Clientes" Icon="users" Value="@_stats.Customers.ToString()" Hint="@($"{_stats.NewsletterSubscribers.Pluralize("suscrito", "suscritos")} al boletín")" />
+            <StatCard Label="Mensajes" Icon="mail" Value="@_stats.UnreadMessages.ToString()" Hint="Formulario de contacto sin leer" />
+        </div>
+
+        <div class="admin-panels">
+            <section class="panel" aria-labelledby="recent-title">
+                <div class="panel__header">
+                    <h2 id="recent-title">Pedidos recientes</h2>
+                    <AppButton Href="/admin/pedidos" Variant="ghost" Size="sm" IconEnd="arrow-right">Ver todos</AppButton>
+                </div>
+                @if (_stats.RecentOrders.Count == 0)
+                {
+                    <div class="panel__body"><p class="muted" style="margin:0">Aún no hay pedidos. ¡Pronto llegarán!</p></div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Estado</th><th scope="col" class="num">Total</th></tr></thead>
+                            <tbody>
+                                @foreach (var o in _stats.RecentOrders)
+                                {
+                                    <tr>
+                                        <td><a href="/admin/pedidos/@o.Id"><strong>@o.OrderNumber</strong></a><br /><span class="small muted">@o.CreatedAt.ToLocalDateTime()</span></td>
+                                        <td>@o.CustomerName</td>
+                                        <td><StatusPill Status="o.Status" /></td>
+                                        <td class="num">@o.Total.ToMoney()</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="panel" aria-labelledby="low-title">
+                <div class="panel__header">
+                    <h2 id="low-title">Reponer pronto</h2>
+                    <AppButton Href="/admin/inventario?bajo=true" Variant="ghost" Size="sm" IconEnd="arrow-right">Inventario</AppButton>
+                </div>
+                @if (_stats.LowStock.Count == 0)
+                {
+                    <div class="panel__body"><p class="muted" style="margin:0">Todo el stock está saludable. 🌿</p></div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th scope="col">Producto</th><th scope="col" class="num">Stock</th></tr></thead>
+                            <tbody>
+                                @foreach (var item in _stats.LowStock)
+                                {
+                                    <tr>
+                                        <td><a href="/admin/productos/@item.ProductId">@item.Name</a><br /><span class="small muted">@item.Sku</span></td>
+                                        <td class="num"><span class="@(item.Stock == 0 ? "stock-out" : "stock-low")">@item.Stock</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardStats? _stats;
+
+    protected override async Task OnInitializedAsync() => _stats = await AdminOrders.GetDashboardAsync();
+}

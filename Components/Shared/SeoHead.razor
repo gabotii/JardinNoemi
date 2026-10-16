@@ -1,0 +1,61 @@
+@* Título, meta descripción, canonical, Open Graph / Twitter y JSON-LD opcional por página. *@
+@inject IOptions<ShopOptions> Store
+@inject NavigationManager Navigation
+
+<PageTitle>@FullTitle</PageTitle>
+<HeadContent>
+    <meta name="description" content="@Description" />
+    <link rel="canonical" href="@CanonicalUrl" />
+    @if (NoIndex)
+    {
+        <meta name="robots" content="noindex, nofollow" />
+    }
+    <meta property="og:type" content="@OgType" />
+    <meta property="og:title" content="@FullTitle" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@CanonicalUrl" />
+    <meta property="og:image" content="@AbsoluteImage" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="@FullTitle" />
+    <meta name="twitter:description" content="@Description" />
+    <meta name="twitter:image" content="@AbsoluteImage" />
+    @if (JsonLd is not null)
+    {
+        @((MarkupString)$"<script type=\"application/ld+json\">{JsonLd}</script>")
+    }
+</HeadContent>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+
+    /// <summary>Ruta canónica (p. ej. "/tienda"). Si se omite, se usa la ruta actual sin query string.</summary>
+    [Parameter] public string? Canonical { get; set; }
+    [Parameter] public string? Image { get; set; }
+    [Parameter] public string OgType { get; set; } = "website";
+    [Parameter] public bool NoIndex { get; set; }
+
+    /// <summary>JSON ya serializado con System.Text.Json (que escapa "&lt;" y evita inyección de &lt;/script&gt;).</summary>
+    [Parameter] public string? JsonLd { get; set; }
+
+    private string BaseUrl => Store.Value.BaseUrl.TrimEnd('/');
+    private string FullTitle => Title == Store.Value.Name ? Title : $"{Title} · {Store.Value.Name}";
+
+    private string CanonicalUrl
+    {
+        get
+        {
+            var path = Canonical ?? "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+            return BaseUrl + path;
+        }
+    }
+
+    private string AbsoluteImage
+    {
+        get
+        {
+            var image = Image ?? "/images/brand/og-image.png";
+            return image.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? image : BaseUrl + image;
+        }
+    }
+}

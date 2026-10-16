@@ -1,0 +1,66 @@
+@page "/cuenta/pedidos"
+@attribute [Authorize]
+@using System.Security.Claims
+@inject IOrderService OrderService
+@inject AuthenticationStateProvider AuthState
+
+<SeoHead Title="Mis pedidos" Description="Historial de pedidos en JardinNoemi." NoIndex="true" />
+
+<div class="page-hero">
+    <div class="container">
+        <Breadcrumbs Items="@([new("Mi cuenta", "/cuenta/perfil"), new("Pedidos")])" />
+        <h1 tabindex="-1">Mis pedidos</h1>
+        <p class="lead">Revisa el estado y el detalle de tus compras.</p>
+    </div>
+</div>
+
+<div class="container account-layout">
+    <AccountNav />
+    <section aria-label="Historial de pedidos">
+        @if (_orders is null)
+        {
+            <LoadingSpinner Label="Cargando tus pedidos…" />
+        }
+        else if (_orders.Count == 0)
+        {
+            <div class="card">
+                <EmptyState Icon="receipt" Title="Aún no tienes pedidos" Text="Cuando compres, aquí podrás seguir cada pedido.">
+                    <Actions><AppButton Href="/tienda" IconEnd="arrow-right">Explorar la tienda</AppButton></Actions>
+                </EmptyState>
+            </div>
+        }
+        else
+        {
+            <ul role="list" class="order-cards">
+                @foreach (var order in _orders)
+                {
+                    <li>
+                        <a class="order-card" href="/pedido/@order.OrderNumber">
+                            <img class="order-card__img" src="@(order.FirstImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="64" height="64" loading="lazy" />
+                            <span>
+                                <span class="order-card__number">@order.OrderNumber</span>
+                                <span class="order-card__meta" style="display:block">@order.CreatedAt.ToLocalDate() · @order.ItemCount.Pluralize("producto", "productos")</span>
+                            </span>
+                            <span style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+                                <StatusPill Status="order.Status" />
+                                <StatusPill Payment="order.PaymentStatus" />
+                            </span>
+                            <span class="order-card__total">@order.Total.ToMoney()</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</div>
+
+@code {
+    private IReadOnlyList<OrderSummaryDto>? _orders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        _orders = userId is null ? [] : await OrderService.GetOrdersForUserAsync(userId);
+    }
+}

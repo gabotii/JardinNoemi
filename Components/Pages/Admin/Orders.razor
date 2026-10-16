@@ -1,0 +1,84 @@
+@page "/admin/pedidos"
+@inject IAdminOrderService AdminOrders
+@inject NavigationManager Navigation
+
+<AdminPageHeader Title="Pedidos" Subtitle="Gestiona pagos, preparación y despachos." />
+
+<div class="admin-content">
+    <div class="admin-toolbar">
+        <div class="search" role="search">
+            <Icon Name="search" />
+            <label class="visually-hidden" for="order-search">Buscar pedidos</label>
+            <input id="order-search" type="search" placeholder="N° de pedido, nombre o correo" value="@Q" @onchange="Search" />
+        </div>
+        <div class="segmented" role="group" aria-label="Filtrar por estado">
+            <a href="@Url(Q, null, 1)" aria-current="@(Estado is null ? "page" : null)">Todos</a>
+            @foreach (var status in Enum.GetValues<OrderStatus>())
+            {
+                <a href="@Url(Q, status.ToString(), 1)" aria-current="@(Estado == status.ToString() ? "page" : null)">@OrderText.Status(status)</a>
+            }
+        </div>
+    </div>
+
+    @if (_result is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else if (_result.Items.Count == 0)
+    {
+        <div class="panel"><EmptyState Icon="receipt" Title="No hay pedidos" Text="Cuando lleguen pedidos con estos filtros aparecerán aquí." /></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Pedido</th>
+                        <th scope="col">Cliente</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Pago</th>
+                        <th scope="col" class="num">Productos</th>
+                        <th scope="col" class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in _result.Items)
+                    {
+                        <tr @key="o.Id">
+                            <td><a href="/admin/pedidos/@o.Id"><strong>@o.OrderNumber</strong></a><br /><span class="small muted">@o.CreatedAt.ToLocalDateTime()</span></td>
+                            <td>@o.CustomerName<br /><span class="small muted">@o.Email</span></td>
+                            <td><StatusPill Status="o.Status" /></td>
+                            <td><StatusPill Payment="o.PaymentStatus" /><br /><span class="small muted">@OrderText.Method(o.PaymentMethod)</span></td>
+                            <td class="num">@o.ItemCount</td>
+                            <td class="num"><strong>@o.Total.ToMoney()</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pagination CurrentPage="_result.Page" TotalPages="_result.TotalPages" UrlFor="@(page => Url(Q, Estado, page))" />
+    }
+</div>
+
+@code {
+    private PagedResult<AdminOrderListItem>? _result;
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "estado")] public string? Estado { get; set; }
+    [SupplyParameterFromQuery(Name = "p")] public int? P { get; set; }
+
+    protected override async Task OnParametersSetAsync() =>
+        _result = await AdminOrders.GetOrdersAsync(new AdminQuery(Q, P ?? 1, 20, Estado));
+
+    private static string Url(string? q, string? estado, int page)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(q)) parts.Add($"q={Uri.EscapeDataString(q)}");
+        if (estado is not null) parts.Add($"estado={estado}");
+        if (page > 1) parts.Add($"p={page}");
+        return parts.Count == 0 ? "/admin/pedidos" : $"/admin/pedidos?{string.Join('&', parts)}";
+    }
+
+    private void Search(ChangeEventArgs e) => Navigation.NavigateTo(Url(e.Value?.ToString(), Estado, 1), replace: true);
+}

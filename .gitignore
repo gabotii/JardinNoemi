@@ -1,0 +1,15 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+TestResults/
+
+## Datos locales (base SQLite, imágenes subidas desde el panel)
+App_Data/
+
+## Python (herramienta de ilustraciones)
+__pycache__/

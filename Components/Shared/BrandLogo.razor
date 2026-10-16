@@ -1,0 +1,21 @@
+<a class="brand @Class" href="/" aria-label="JardinNoemi, ir al inicio">
+    <svg class="brand__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <path d="M9 43V22a15 15 0 0 1 30 0v21" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+        <path d="M6 43h36" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+        <path d="M24 42V25" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+        <path d="M24 32c-6.5 0-10.5-4-10.5-10 6.5 0 10.5 4 10.5 10Z" fill="currentColor" opacity=".9" />
+        <path d="M24 27.5c0-6.2 3.8-10.5 10.5-10.5 0 6.4-4 10.5-10.5 10.5Z" fill="currentColor" opacity=".55" />
+    </svg>
+    <span class="brand__text">
+        <span class="brand__name">Jardín <em>Noemí</em></span>
+        @if (ShowTagline)
+        {
+            <span class="brand__tag">Plantas con alma</span>
+        }
+    </span>
+</a>
+
+@code {
+    [Parameter] public bool ShowTagline { get; set; } = true;
+    [Parameter] public string? Class { get; set; }
+}

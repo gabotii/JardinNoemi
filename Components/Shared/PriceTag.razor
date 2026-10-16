@@ -1,0 +1,22 @@
+<span class="price @(Large ? "price--lg" : null) @Class">
+    @if (IsOnSale)
+    {
+        <span class="visually-hidden">Precio oferta:</span>
+        <span class="price__current price__current--sale">@Price.ToMoney()</span>
+        <span class="visually-hidden">Precio anterior:</span>
+        <s class="price__before">@CompareAt!.Value.ToMoney()</s>
+    }
+    else
+    {
+        <span class="price__current">@Price.ToMoney()</span>
+    }
+</span>
+
+@code {
+    [Parameter] public decimal Price { get; set; }
+    [Parameter] public decimal? CompareAt { get; set; }
+    [Parameter] public bool Large { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private bool IsOnSale => CompareAt is { } before && before > Price;
+}

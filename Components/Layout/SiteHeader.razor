@@ -1,0 +1,112 @@
+@inject CartState CartState
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<header class="site-header">
+    <div class="container site-header__inner">
+        <div class="site-header__menu">
+            @* popovertarget: el menú funciona de forma nativa incluso en páginas sin interactividad *@
+            <button type="button" class="icon-btn" popovertarget="mobile-nav" aria-label="Abrir menú">
+                <Icon Name="menu" />
+            </button>
+        </div>
+
+        <BrandLogo />
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);min-width:0">
+            <nav class="site-header__nav main-nav" aria-label="Principal">
+                <ul>
+                    <li><NavLink href="/" Match="NavLinkMatch.All">Inicio</NavLink></li>
+                    <li><NavLink href="/tienda" Match="NavLinkMatch.All">Tienda</NavLink></li>
+                    <li><NavLink href="/tienda/plantas-de-interior">Plantas</NavLink></li>
+                    <li><NavLink href="/tienda/regalos">Regalos</NavLink></li>
+                    <li><NavLink href="/nosotros">Nosotros</NavLink></li>
+                    <li><NavLink href="/contacto">Contacto</NavLink></li>
+                </ul>
+            </nav>
+
+            <div class="header-actions" style="margin-left:auto">
+                <form class="header-search" role="search" action="/tienda" method="get" @onsubmit="SubmitSearch" @onsubmit:preventDefault="RendererInfo.IsInteractive">
+                    <label for="header-q" class="visually-hidden">Buscar productos</label>
+                    <Icon Name="search" />
+                    <input id="header-q" name="q" type="search" placeholder="Buscar plantas, macetas…" autocomplete="off"
+                           @bind="_query" />
+                </form>
+                <a href="/tienda" class="icon-btn search-toggle" aria-label="Buscar en la tienda"><Icon Name="search" /></a>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <AuthorizeView Policy="@Policies.Admin" Context="adminContext">
+                            <a href="/admin" class="icon-btn account-link" aria-label="Panel de administración" title="Panel de administración"><Icon Name="grid" /></a>
+                        </AuthorizeView>
+                        <a href="/cuenta/perfil" class="icon-btn account-link" aria-label="Mi cuenta" title="Mi cuenta"><Icon Name="user" /></a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/cuenta/ingresar" class="icon-btn account-link" aria-label="Ingresar a mi cuenta" title="Ingresar"><Icon Name="user" /></a>
+                    </NotAuthorized>
+                </AuthorizeView>
+
+                <a href="/carrito" class="icon-btn" aria-label="@CartLabel" @onclick="OpenCart" @onclick:preventDefault="RendererInfo.IsInteractive">
+                    <Icon Name="bag" />
+                    @if (CartState.Cart.ItemCount > 0)
+                    {
+                        <span class="cart-badge @(_bump ? "bump" : null)" aria-hidden="true">@CartState.Cart.ItemCount</span>
+                    }
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<MobileNavigation />
+
+@code {
+    private string? _query;
+    private int _lastCount;
+    private bool _bump;
+
+    private string CartLabel => CartState.Cart.ItemCount switch
+    {
+        0 => "Carrito vacío",
+        1 => "Carrito: 1 producto",
+        var n => $"Carrito: {n} productos"
+    };
+
+    protected override void OnInitialized()
+    {
+        CartState.Changed += OnCartChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnCartChanged()
+    {
+        var count = CartState.Cart.ItemCount;
+        _bump = count > _lastCount && _lastCount > 0 || (count > 0 && _lastCount == 0 && CartState.IsDrawerOpen);
+        _lastCount = count;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Mantiene el término en el buscador solo dentro de la tienda.
+        var uri = Navigation.ToAbsoluteUri(e.Location);
+        if (!uri.AbsolutePath.StartsWith("/tienda", StringComparison.OrdinalIgnoreCase)) _query = null;
+    }
+
+    private void OpenCart()
+    {
+        if (RendererInfo.IsInteractive) CartState.OpenDrawer();
+    }
+
+    private void SubmitSearch()
+    {
+        var q = _query?.Trim();
+        Navigation.NavigateTo(string.IsNullOrEmpty(q) ? "/tienda" : $"/tienda?q={Uri.EscapeDataString(q)}");
+    }
+
+    public void Dispose()
+    {
+        CartState.Changed -= OnCartChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

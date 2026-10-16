@@ -1,0 +1,65 @@
+@* Modal accesible basado en <dialog> nativo: trampa de foco, Escape y fondo inerte sin librerías. *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<dialog @ref="_dialog" class="modal @Class" aria-labelledby="@_titleId" data-light-dismiss @onclose="OnDialogClosed">
+    @if (IsOpen)
+    {
+        <div class="modal__header">
+            <h2 id="@_titleId">@Title</h2>
+            <button type="button" class="icon-btn" aria-label="Cerrar" @onclick="CloseAsync">
+                <Icon Name="x" />
+            </button>
+        </div>
+        <div class="modal__body">@ChildContent</div>
+        @if (Footer is not null)
+        {
+            <div class="modal__footer">@Footer</div>
+        }
+    }
+</dialog>
+
+@code {
+    private readonly string _titleId = $"modal-{Guid.NewGuid():N}"[..14];
+    private ElementReference _dialog;
+    private bool _renderedOpen;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (IsOpen == _renderedOpen) return;
+        _renderedOpen = IsOpen;
+        try
+        {
+            await JS.InvokeVoidAsync(IsOpen ? "jn.showModal" : "jn.closeModal", _dialog);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async Task CloseAsync()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    // Cierre nativo (Escape o clic en el fondo): sincroniza el estado de Blazor.
+    private async Task OnDialogClosed()
+    {
+        if (!IsOpen) return;
+        _renderedOpen = false;
+        await CloseAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_renderedOpen) return;
+        try { await JS.InvokeVoidAsync("jn.closeModal", _dialog); }
+        catch (JSDisconnectedException) { }
+    }
+}

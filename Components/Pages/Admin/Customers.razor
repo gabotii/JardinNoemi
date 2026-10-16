@@ -1,0 +1,82 @@
+@page "/admin/clientes"
+@inject IAdminOrderService AdminOrders
+@inject NavigationManager Navigation
+
+<AdminPageHeader Title="Clientes" Subtitle="Compradores registrados e invitados." />
+
+<div class="admin-content">
+    <div class="admin-toolbar">
+        <div class="search" role="search">
+            <Icon Name="search" />
+            <label class="visually-hidden" for="customer-search">Buscar clientes</label>
+            <input id="customer-search" type="search" placeholder="Nombre o correo" value="@Q" @onchange="Search" />
+        </div>
+        <div class="segmented" role="group" aria-label="Tipo de cliente">
+            <a href="@Url(Q, null, 1)" aria-current="@(F is null ? "page" : null)">Todos</a>
+            <a href="@Url(Q, "registered", 1)" aria-current="@(F == "registered" ? "page" : null)">Registrados</a>
+            <a href="@Url(Q, "guest", 1)" aria-current="@(F == "guest" ? "page" : null)">Invitados</a>
+        </div>
+    </div>
+
+    @if (_result is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else if (_result.Items.Count == 0)
+    {
+        <div class="panel"><EmptyState Icon="users" Title="Sin clientes" Text="Los compradores aparecerán aquí después de su primer pedido o registro." /></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Cliente</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col" class="num">Pedidos</th>
+                        <th scope="col" class="num">Total pagado</th>
+                        <th scope="col">Último pedido</th>
+                        <th scope="col">Alta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _result.Items)
+                    {
+                        <tr @key="c.Id">
+                            <td><strong>@c.FullName</strong><br /><a class="small" href="mailto:@c.Email">@c.Email</a>@(c.Phone is null ? "" : $" · {c.Phone}")</td>
+                            <td><span class="pill @(c.IsRegistered ? "pill--info" : "pill--neutral")">@(c.IsRegistered ? "Registrado" : "Invitado")</span></td>
+                            <td class="num">@c.OrderCount</td>
+                            <td class="num">@c.TotalSpent.ToMoney()</td>
+                            <td>@(c.LastOrderAt?.ToLocalDate() ?? "—")</td>
+                            <td>@c.CreatedAt.ToLocalDate()</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pagination CurrentPage="_result.Page" TotalPages="_result.TotalPages" UrlFor="@(page => Url(Q, F, page))" />
+    }
+</div>
+
+@code {
+    private PagedResult<AdminCustomerListItem>? _result;
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "f")] public string? F { get; set; }
+    [SupplyParameterFromQuery(Name = "p")] public int? P { get; set; }
+
+    protected override async Task OnParametersSetAsync() =>
+        _result = await AdminOrders.GetCustomersAsync(new AdminQuery(Q, P ?? 1, 20, F));
+
+    private static string Url(string? q, string? f, int page)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(q)) parts.Add($"q={Uri.EscapeDataString(q)}");
+        if (f is not null) parts.Add($"f={f}");
+        if (page > 1) parts.Add($"p={page}");
+        return parts.Count == 0 ? "/admin/clientes" : $"/admin/clientes?{string.Join('&', parts)}";
+    }
+
+    private void Search(ChangeEventArgs e) => Navigation.NavigateTo(Url(e.Value?.ToString(), F, 1), replace: true);
+}

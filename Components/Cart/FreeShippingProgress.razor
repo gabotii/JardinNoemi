@@ -1,0 +1,27 @@
+@inject IOptionsMonitor<ShippingOptions> Shipping
+
+@if (Threshold > 0)
+{
+    <div class="shipping-progress">
+        @if (Missing <= 0)
+        {
+            <span><Icon Name="check-circle" Class="icon--sm" /> <strong>¡Tienes despacho gratis!</strong></span>
+        }
+        else
+        {
+            <span>Te faltan <strong>@Missing.ToMoney()</strong> para el despacho gratis.</span>
+        }
+        <div class="shipping-progress__bar" role="progressbar" aria-label="Progreso hacia despacho gratis"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent">
+            <span style="width:@Percent%"></span>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public decimal Subtotal { get; set; }
+
+    private decimal Threshold => Shipping.CurrentValue.FreeShippingThreshold;
+    private decimal Missing => Threshold - Subtotal;
+    private int Percent => Threshold <= 0 ? 100 : (int)Math.Clamp(Subtotal / Threshold * 100, 0, 100);
+}

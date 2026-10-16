@@ -1,0 +1,251 @@
+@page "/tienda"
+@page "/tienda/{CategorySlug}"
+@using System.Text.Json
+@inject ICatalogService Catalog
+@inject NavigationManager Navigation
+@inject IOptions<ShopOptions> Store
+
+<SeoHead Title="@SeoTitle" Description="@SeoDescription" Canonical="@CanonicalPath" NoIndex="_filters.Search is not null" JsonLd="@ItemListJsonLd" />
+
+<div class="page-hero">
+    <div class="container">
+        <Breadcrumbs Items="Crumbs" />
+        <h1 tabindex="-1">@Heading</h1>
+        <p class="lead">@Lead</p>
+    </div>
+</div>
+
+<div class="container catalog">
+    <aside class="catalog__sidebar" aria-label="Filtros">
+        <FilterPanel Filters="_filters" Categories="Categories" FiltersChanged="ApplyFiltersAsync" />
+    </aside>
+
+    <div>
+        <SearchBar Value="@_filters.Search" ValueChanged="SearchAsync" />
+
+        <div class="catalog-toolbar">
+            <p class="catalog-toolbar__count" role="status" aria-live="polite" style="margin:0">
+                @if (Result is not null)
+                {
+                    <strong>@Result.TotalCount</strong> @(Result.TotalCount == 1 ? " producto" : " productos")
+                }
+            </p>
+            <div class="catalog-toolbar__controls">
+                <AppButton Variant="outline" Size="sm" IconStart="sliders" Class="filters-toggle" OnClick="() => _filtersOpen = true">
+                    Filtros @(ActiveFilterCount > 0 ? $"({ActiveFilterCount})" : null)
+                </AppButton>
+                <label for="sort" class="visually-hidden">Ordenar por</label>
+                <select id="sort" class="input" @onchange="SortAsync" aria-label="Ordenar productos">
+                    @foreach (var sort in Enum.GetValues<ProductSort>())
+                    {
+                        <option value="@CatalogFilters.SortToken(sort)" selected="@(sort == _filters.Sort)">@CatalogFilters.SortLabel(sort)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (_filters.HasActiveFilters)
+        {
+            <div class="active-filters" aria-label="Filtros activos">
+                @if (_filters.Search is not null)
+                {
+                    <span class="chip">“@_filters.Search” <button type="button" aria-label="Quitar búsqueda" @onclick="() => ApplyFiltersAsync(_filters with { Search = null, Page = 1 })"><Icon Name="x" Class="icon--sm" /></button></span>
+                }
+                @if (_filters.MinPrice is not null || _filters.MaxPrice is not null)
+                {
+                    <span class="chip">@PriceChip <button type="button" aria-label="Quitar filtro de precio" @onclick="() => ApplyFiltersAsync(_filters with { MinPrice = null, MaxPrice = null, Page = 1 })"><Icon Name="x" Class="icon--sm" /></button></span>
+                }
+                @if (_filters.OnSale)
+                {
+                    <span class="chip">En oferta <button type="button" aria-label="Quitar filtro en oferta" @onclick="() => ApplyFiltersAsync(_filters with { OnSale = false, Page = 1 })"><Icon Name="x" Class="icon--sm" /></button></span>
+                }
+                @if (_filters.InStock)
+                {
+                    <span class="chip">Disponibles <button type="button" aria-label="Quitar filtro disponibles" @onclick="() => ApplyFiltersAsync(_filters with { InStock = false, Page = 1 })"><Icon Name="x" Class="icon--sm" /></button></span>
+                }
+                @if (_filters.PetFriendly)
+                {
+                    <span class="chip">Aptas para mascotas <button type="button" aria-label="Quitar filtro mascotas" @onclick="() => ApplyFiltersAsync(_filters with { PetFriendly = false, Page = 1 })"><Icon Name="x" Class="icon--sm" /></button></span>
+                }
+            </div>
+        }
+
+        <div class="catalog__results @(_loading && Result is not null ? "is-loading" : null)" aria-busy="@(_loading ? "true" : "false")">
+            <ProductGrid Products="Result?.Items" Loading="_loading || Result is null" SkeletonCount="9" PriorityCount="3" HeadingLevel="2" Label="Resultados">
+                <Empty>
+                    <EmptyState Icon="search" Title="No encontramos productos"
+                                Text="Prueba con otra palabra, quita algún filtro o explora nuestras categorías.">
+                        <Actions>
+                            <AppButton OnClick="ClearAllAsync" IconStart="refresh">Limpiar filtros</AppButton>
+                            <AppButton Href="/tienda" Variant="outline">Ver toda la tienda</AppButton>
+                        </Actions>
+                    </EmptyState>
+                </Empty>
+            </ProductGrid>
+        </div>
+
+        @if (Result is { TotalPages: > 1 })
+        {
+            <div class="catalog__more">
+                <p class="small muted" style="margin:0">
+                    Mostrando @((Result.Page - 1) * Result.PageSize + 1)–@(Math.Min(Result.Page * Result.PageSize, Result.TotalCount)) de @Result.TotalCount
+                </p>
+                <Pagination CurrentPage="Result.Page" TotalPages="Result.TotalPages" UrlFor="PageUrl" Label="Páginas del catálogo" />
+            </div>
+        }
+    </div>
+</div>
+
+<Drawer Title="Filtros" Side="left" @bind-IsOpen="_filtersOpen">
+    <ChildContent>
+        <FilterPanel Filters="_filters" Categories="Categories" FiltersChanged="ApplyFiltersAsync" />
+    </ChildContent>
+    <Footer>
+        <AppButton Block="true" OnClick="() => _filtersOpen = false">
+            Ver @(Result?.TotalCount ?? 0) resultados
+        </AppButton>
+    </Footer>
+</Drawer>
+
+@code {
+    private const int PageSize = 12;
+
+    private CatalogFilters _filters = new();
+    private bool _loading;
+    private bool _filtersOpen;
+    private int _requestVersion;
+    private CategoryDto? _category;
+
+    [Parameter] public string? CategorySlug { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "min")] public decimal? Min { get; set; }
+    [SupplyParameterFromQuery(Name = "max")] public decimal? Max { get; set; }
+    [SupplyParameterFromQuery(Name = "oferta")] public bool? Oferta { get; set; }
+    [SupplyParameterFromQuery(Name = "stock")] public bool? Stock { get; set; }
+    [SupplyParameterFromQuery(Name = "mascotas")] public bool? Mascotas { get; set; }
+    [SupplyParameterFromQuery(Name = "orden")] public string? Orden { get; set; }
+    [SupplyParameterFromQuery(Name = "pagina")] public int? Pagina { get; set; }
+
+    /// <summary>Resultado del prerender transferido al circuito (evita consultar dos veces).</summary>
+    [PersistentState]
+    public CatalogState? State { get; set; }
+
+    private PagedResult<ProductCardDto>? Result => State?.Result;
+    private IReadOnlyList<CategoryDto> Categories => State?.Categories ?? [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _filters = new CatalogFilters
+        {
+            Search = string.IsNullOrWhiteSpace(Q) ? null : Q.Trim(),
+            Category = string.IsNullOrWhiteSpace(CategorySlug) ? null : CategorySlug.ToLowerInvariant(),
+            MinPrice = Min is >= 0 ? Min : null,
+            MaxPrice = Max is >= 0 ? Max : null,
+            OnSale = Oferta == true,
+            InStock = Stock == true,
+            PetFriendly = Mascotas == true,
+            Sort = CatalogFilters.ParseSort(Orden),
+            Page = Math.Max(1, Pagina ?? 1)
+        };
+
+        var key = _filters.ToUrl();
+        var categories = State?.Categories ?? await Catalog.GetCategoriesAsync();
+        _category = _filters.Category is null ? null : categories.FirstOrDefault(c => c.Slug == _filters.Category);
+
+        if (_filters.Category is not null && _category is null)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        if (State?.Key == key) return;
+
+        var version = ++_requestVersion;
+        _loading = true;
+        var result = await Catalog.SearchAsync(_filters.ToQuery(PageSize));
+        if (version != _requestVersion) return; // llegó una consulta más nueva mientras esperábamos
+
+        // Página fuera de rango (p. ej. enlace antiguo): se muestra la última disponible.
+        if (result.TotalCount > 0 && result.Items.Count == 0 && _filters.Page > 1)
+        {
+            Navigation.NavigateTo((_filters with { Page = result.TotalPages }).ToUrl(), replace: true);
+            return;
+        }
+
+        State = new CatalogState(key, result, categories);
+        _loading = false;
+    }
+
+    private Task ApplyFiltersAsync(CatalogFilters filters)
+    {
+        Navigation.NavigateTo(filters.ToUrl(), replace: true);
+        return Task.CompletedTask;
+    }
+
+    private Task SearchAsync(string? value) => ApplyFiltersAsync(_filters with { Search = value, Page = 1 });
+
+    private Task SortAsync(ChangeEventArgs e) =>
+        ApplyFiltersAsync(_filters with { Sort = CatalogFilters.ParseSort(e.Value?.ToString()), Page = 1 });
+
+    private Task ClearAllAsync() => ApplyFiltersAsync(new CatalogFilters { Category = _filters.Category });
+
+    private string PageUrl(int page) => (_filters with { Page = page }).ToUrl();
+
+    private int ActiveFilterCount =>
+        (_filters.MinPrice is not null || _filters.MaxPrice is not null ? 1 : 0) + (_filters.OnSale ? 1 : 0) + (_filters.InStock ? 1 : 0) + (_filters.PetFriendly ? 1 : 0);
+
+    private string PriceChip => (_filters.MinPrice, _filters.MaxPrice) switch
+    {
+        ({ } min, { } max) => $"{min.ToMoney()} – {max.ToMoney()}",
+        ({ } min, null) => $"Desde {min.ToMoney()}",
+        (null, { } max) => $"Hasta {max.ToMoney()}",
+        _ => string.Empty
+    };
+
+    private string Heading => _filters.Search is not null ? $"Resultados para “{_filters.Search}”" : _category?.Name ?? (_filters.OnSale ? "Ofertas" : "Toda la tienda");
+
+    private string Lead => _category?.Description
+                           ?? "Plantas de interior, suculentas, terrarios, macetas artesanales y todo lo necesario para cuidarlas.";
+
+    private IReadOnlyList<Breadcrumbs.Crumb> Crumbs => _category is null
+        ? [new("Tienda")]
+        : [new("Tienda", "/tienda"), new(_category.Name)];
+
+    private string SeoTitle => _category?.Name ?? (_filters.OnSale ? "Ofertas" : "Tienda de plantas");
+
+    private string SeoDescription => _category is null
+        ? "Compra plantas de interior, suculentas, cactus, terrarios, macetas y regalos con despacho a todo Chile. Filtra por precio, categoría y más."
+        : $"{_category.Description} Compra online en JardinNoemi con despacho a todo Chile.";
+
+    private string CanonicalPath
+    {
+        get
+        {
+            var path = _filters.Category is null ? "/tienda" : $"/tienda/{_filters.Category}";
+            return _filters.Page > 1 && !_filters.HasActiveFilters ? $"{path}?pagina={_filters.Page}" : path;
+        }
+    }
+
+    private string? ItemListJsonLd
+    {
+        get
+        {
+            if (Result is not { Items.Count: > 0 }) return null;
+            var baseUrl = Store.Value.BaseUrl.TrimEnd('/');
+            return JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "ItemList",
+                ["itemListElement"] = Result.Items.Select((p, i) => new Dictionary<string, object>
+                {
+                    ["@type"] = "ListItem",
+                    ["position"] = (Result.Page - 1) * Result.PageSize + i + 1,
+                    ["url"] = $"{baseUrl}/producto/{p.Slug}",
+                    ["name"] = p.Name
+                }).ToList()
+            });
+        }
+    }
+
+    public sealed record CatalogState(string Key, PagedResult<ProductCardDto> Result, IReadOnlyList<CategoryDto> Categories);
+}

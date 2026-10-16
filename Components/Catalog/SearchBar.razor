@@ -1,0 +1,78 @@
+@* Búsqueda con "debounce": notifica al dejar de escribir (evita una consulta por tecla). *@
+@implements IDisposable
+
+<div class="catalog-search" role="search">
+    <label for="@_id" class="visually-hidden">@Label</label>
+    <Icon Name="search" />
+    <input id="@_id" type="search" placeholder="@Placeholder" autocomplete="off" enterkeyhint="search"
+           value="@_text" @oninput="OnInput" @onkeydown="OnKeyDown" />
+    @if (!string.IsNullOrEmpty(_text))
+    {
+        <AppButton Variant="ghost" Size="sm" IconOnly="true" Class="catalog-search__clear" AriaLabel="Limpiar búsqueda" OnClick="ClearAsync">
+            <Icon Name="x" />
+        </AppButton>
+    }
+</div>
+
+@code {
+    private readonly string _id = $"search-{Guid.NewGuid():N}"[..15];
+    private string? _text;
+    private string? _lastParameter;
+    private CancellationTokenSource? _debounce;
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Buscar plantas, macetas, regalos…";
+    [Parameter] public string Label { get; set; } = "Buscar productos";
+    [Parameter] public int DelayMs { get; set; } = 400;
+
+    protected override void OnParametersSet()
+    {
+        // Solo se sobrescribe el texto si el valor cambió desde fuera (p. ej. al limpiar filtros).
+        if (Value != _lastParameter)
+        {
+            _text = Value;
+            _lastParameter = Value;
+        }
+    }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString();
+        _debounce?.Cancel();
+        _debounce = new CancellationTokenSource();
+        var token = _debounce.Token;
+        try
+        {
+            await Task.Delay(DelayMs, token);
+            await NotifyAsync();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _debounce?.Cancel();
+            await NotifyAsync();
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        _debounce?.Cancel();
+        _text = null;
+        await NotifyAsync();
+    }
+
+    private async Task NotifyAsync()
+    {
+        var value = string.IsNullOrWhiteSpace(_text) ? null : _text.Trim();
+        if (value == _lastParameter) return;
+        _lastParameter = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

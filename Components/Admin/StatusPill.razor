@@ -1,0 +1,13 @@
+@if (Status is not null)
+{
+    <span class="pill pill--@OrderText.StatusTone(Status.Value)">@OrderText.Status(Status.Value)</span>
+}
+else if (Payment is not null)
+{
+    <span class="pill pill--@OrderText.PaymentTone(Payment.Value)">@OrderText.Payment(Payment.Value)</span>
+}
+
+@code {
+    [Parameter] public OrderStatus? Status { get; set; }
+    [Parameter] public PaymentStatus? Payment { get; set; }
+}

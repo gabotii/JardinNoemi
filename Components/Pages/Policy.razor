@@ -1,0 +1,103 @@
+@page "/politicas/{Slug}"
+@inject NavigationManager Navigation
+@inject IOptions<ShopOptions> Options
+@inject IOptionsMonitor<ShippingOptions> Shipping
+
+@* Textos base de ejemplo: deben ser revisados por el emprendimiento (y asesoría legal) antes de publicar. *@
+@if (_policy is not null)
+{
+    <SeoHead Title="@_policy.Title" Description="@_policy.Summary" />
+
+    <div class="page-hero">
+        <div class="container container--narrow">
+            <Breadcrumbs Items="@([new("Políticas"), new(_policy.Title)])" />
+            <h1 tabindex="-1">@_policy.Title</h1>
+            <p class="lead">@_policy.Summary</p>
+        </div>
+    </div>
+
+    <div class="container container--narrow section section--tight">
+        <nav class="policy-nav segmented" aria-label="Políticas">
+            @foreach (var (slug, title) in Links)
+            {
+                <a href="/politicas/@slug" aria-current="@(slug == Slug ? "page" : null)">@title</a>
+            }
+        </nav>
+        <article class="prose">@_policy.Body</article>
+    </div>
+}
+
+@code {
+    private PolicyContent? _policy;
+
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private static readonly (string Slug, string Title)[] Links =
+    [
+        ("envios", "Envíos"), ("devoluciones", "Cambios"), ("privacidad", "Privacidad"), ("terminos", "Términos")
+    ];
+
+    private sealed record PolicyContent(string Title, string Summary, RenderFragment Body);
+
+    protected override void OnParametersSet()
+    {
+        _policy = Slug switch
+        {
+            "envios" => new("Envíos y retiros", "Cómo, cuándo y cuánto cuesta recibir tus plantas.", Envios),
+            "devoluciones" => new("Cambios y devoluciones", "Nuestra garantía de llegada y cómo gestionar un cambio.", Devoluciones),
+            "privacidad" => new("Política de privacidad", "Qué datos recopilamos, para qué los usamos y cómo los protegemos.", Privacidad),
+            "terminos" => new("Términos y condiciones", "Las reglas que rigen las compras en JardinNoemi.", Terminos),
+            _ => null
+        };
+        if (_policy is null) Navigation.NotFound();
+    }
+
+    private RenderFragment Envios => __builder =>
+    {
+        var s = Shipping.CurrentValue;
+        <h2>Plazos</h2>
+        <p>Despachamos de lunes a viernes. Los pedidos confirmados antes de las 13:00 salen el mismo día hábil. El plazo estimado de entrega es de @s.EstimatedDaysMin a @s.EstimatedDaysMax días hábiles según la región.</p>
+        <h2>Costos</h2>
+        <ul>
+            <li>Despacho gratis en compras sobre @s.FreeShippingThreshold.ToMoney().</li>
+            <li>Tarifa general: @s.DefaultRate.ToMoney(). Algunas regiones tienen tarifa especial, que verás antes de pagar.</li>
+            <li>Retiro en nuestro taller: gratis. @Options.Value.Address.</li>
+        </ul>
+        <h2>Embalaje</h2>
+        <p>Usamos cajas reforzadas, papel kraft y fijaciones de cartón para que las plantas viajen erguidas y protegidas. Todo el material es reciclable o reutilizable.</p>
+    };
+
+    private RenderFragment Devoluciones => __builder =>
+    {
+        <h2>Garantía de llegada (7 días)</h2>
+        <p>Si tu planta llega dañada, envíanos una foto a @Options.Value.Email dentro de 7 días desde la entrega y la reponemos sin costo.</p>
+        <h2>Accesorios y macetas</h2>
+        <p>Tienes 30 días para cambios o devoluciones de productos sin uso y en su embalaje original. Los costos de envío de devolución corren por cuenta del cliente, salvo fallas.</p>
+        <h2>Derecho a retracto</h2>
+        <p>Para compras a distancia aplican los derechos que establece la Ley N° 19.496 sobre Protección de los Derechos de los Consumidores. Las plantas, por ser productos vivos y perecibles, pueden quedar excluidas del retracto según lo que corresponda por ley.</p>
+    };
+
+    private RenderFragment Privacidad => __builder =>
+    {
+        <h2>Datos que recopilamos</h2>
+        <p>Nombre, correo, teléfono y dirección de despacho, necesarios para procesar tus pedidos. No almacenamos datos de tarjetas: el pago lo procesa la pasarela de pago.</p>
+        <h2>Uso</h2>
+        <ul>
+            <li>Procesar y despachar tus pedidos.</li>
+            <li>Responder tus consultas.</li>
+            <li>Enviarte nuestro boletín, solo si te suscribes (puedes darte de baja cuando quieras).</li>
+        </ul>
+        <h2>Tus derechos</h2>
+        <p>Puedes solicitar acceso, rectificación o eliminación de tus datos escribiendo a @Options.Value.Email.</p>
+    };
+
+    private RenderFragment Terminos => __builder =>
+    {
+        <h2>Precios y stock</h2>
+        <p>Los precios incluyen impuestos y están expresados en pesos chilenos. El stock se confirma al momento del pago.</p>
+        <h2>Medios de pago</h2>
+        <p>Aceptamos tarjetas de crédito y débito a través de nuestra pasarela de pago, y transferencia bancaria. Los pedidos pagados por transferencia se reservan por un plazo limitado.</p>
+        <h2>Productos vivos</h2>
+        <p>Cada planta es única: su forma, tamaño y color pueden variar levemente respecto de las imágenes referenciales.</p>
+    };
+}

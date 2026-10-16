@@ -1,0 +1,16 @@
+<div class="stat-card @(Alert ? "stat-card--alert" : null)">
+    <span class="stat-card__label">@Label <Icon Name="@Icon" /></span>
+    <span class="stat-card__value">@Value</span>
+    @if (Hint is not null)
+    {
+        <span class="stat-card__hint">@Hint</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = "sparkles";
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public bool Alert { get; set; }
+}

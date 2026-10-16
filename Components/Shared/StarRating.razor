@@ -1,0 +1,25 @@
+<span class="rating @Class">
+    <span class="rating__stars" role="img" aria-label="@($"Valoración {Value.ToString("0.0", Money.Culture)} de 5")">
+        <svg class="rating__base" viewBox="0 0 80 16" aria-hidden="true"><use href="#jn-stars" /></svg>
+        <span class="rating__fill" style="width:@FillWidth">
+            <svg viewBox="0 0 80 16" aria-hidden="true"><use href="#jn-stars" /></svg>
+        </span>
+    </span>
+    @if (ShowValue)
+    {
+        <span class="rating__value" aria-hidden="true">@Value.ToString("0.0", Money.Culture)</span>
+    }
+    @if (Count is not null)
+    {
+        <span class="rating__count">(@Count)</span>
+    }
+</span>
+
+@code {
+    [Parameter] public double Value { get; set; }
+    [Parameter] public int? Count { get; set; }
+    [Parameter] public bool ShowValue { get; set; } = true;
+    [Parameter] public string? Class { get; set; }
+
+    private string FillWidth => $"{Math.Clamp(Value / 5 * 100, 0, 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}%";
+}

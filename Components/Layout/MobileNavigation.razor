@@ -1,0 +1,61 @@
+@* Menú móvil con Popover API: accesible (Esc, foco, cierre al tocar fuera) y sin JavaScript propio. *@
+@inject ICatalogService Catalog
+
+<nav id="mobile-nav" class="mobile-nav" popover aria-label="Menú principal">
+    <div class="mobile-nav__header">
+        <BrandLogo ShowTagline="false" />
+        <button type="button" class="icon-btn" popovertarget="mobile-nav" popovertargetaction="hide" aria-label="Cerrar menú">
+            <Icon Name="x" />
+        </button>
+    </div>
+    <div class="mobile-nav__body">
+        <form class="mobile-nav__search" role="search" action="/tienda" method="get">
+            <label for="mobile-q" class="visually-hidden">Buscar productos</label>
+            <Icon Name="search" />
+            <input id="mobile-q" name="q" type="search" placeholder="Buscar en la tienda" autocomplete="off" />
+        </form>
+
+        <ul class="mobile-nav__links">
+            <li><a href="/">Inicio <Icon Name="chevron-right" /></a></li>
+            <li><a href="/tienda">Toda la tienda <Icon Name="chevron-right" /></a></li>
+            <li><a href="/tienda?oferta=true">Ofertas <Icon Name="chevron-right" /></a></li>
+            <li><a href="/nosotros">Nuestra historia <Icon Name="chevron-right" /></a></li>
+            <li><a href="/contacto">Contacto <Icon Name="chevron-right" /></a></li>
+        </ul>
+
+        @if (_categories.Count > 0)
+        {
+            <div>
+                <p class="mobile-nav__label">Categorías</p>
+                <ul class="mobile-nav__cats">
+                    @foreach (var c in _categories)
+                    {
+                        <li><a href="/tienda/@c.Slug">@c.Name</a></li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+    <div class="mobile-nav__footer">
+        <AuthorizeView>
+            <Authorized>
+                <AppButton Href="/cuenta/perfil" Variant="outline" Block="true" IconStart="user">Mi cuenta</AppButton>
+                <form action="/cuenta/salir" method="post">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <AppButton Type="submit" Variant="ghost" Block="true" IconStart="logout">Cerrar sesión</AppButton>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <AppButton Href="/cuenta/ingresar" Block="true" IconStart="user">Ingresar</AppButton>
+                <AppButton Href="/cuenta/registro" Variant="outline" Block="true">Crear cuenta</AppButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</nav>
+
+@code {
+    private IReadOnlyList<CategoryDto> _categories = [];
+
+    protected override async Task OnInitializedAsync() => _categories = await Catalog.GetCategoriesAsync();
+}

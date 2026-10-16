@@ -1,0 +1,10 @@
+<div class="spinner @(Center ? "spinner--center" : null)" role="status" aria-live="polite">
+    <span class="spinner__ring" aria-hidden="true"></span>
+    <span class="@(ShowLabel ? null : "visually-hidden")">@Label</span>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Cargando…";
+    [Parameter] public bool Center { get; set; }
+    [Parameter] public bool ShowLabel { get; set; } = true;
+}

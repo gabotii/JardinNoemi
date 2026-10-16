@@ -1,0 +1,62 @@
+<div class="price-filter">
+    <div class="price-filter__inputs">
+        <label class="visually-hidden" for="@($"{_id}-min")">Precio mínimo</label>
+        <input id="@($"{_id}-min")" type="number" inputmode="numeric" min="0" step="1000" placeholder="Mín." @bind="_min" />
+        <span aria-hidden="true">–</span>
+        <label class="visually-hidden" for="@($"{_id}-max")">Precio máximo</label>
+        <input id="@($"{_id}-max")" type="number" inputmode="numeric" min="0" step="1000" placeholder="Máx." @bind="_max" />
+    </div>
+    <div class="price-filter__presets" aria-label="Rangos sugeridos">
+        @foreach (var (label, min, max) in Presets)
+        {
+            <button type="button" @onclick="() => ApplyAsync(min, max)">@label</button>
+        }
+    </div>
+    <AppButton Variant="outline" Size="sm" OnClick="() => ApplyAsync(_min, _max)">Aplicar precio</AppButton>
+    @if (_error is not null)
+    {
+        <p class="validation-message" role="alert">@_error</p>
+    }
+</div>
+
+@code {
+    private readonly string _id = $"price-{Guid.NewGuid():N}"[..14];
+    private decimal? _min;
+    private decimal? _max;
+    private string? _error;
+
+    [Parameter] public decimal? Min { get; set; }
+    [Parameter] public decimal? Max { get; set; }
+    [Parameter] public EventCallback<(decimal? Min, decimal? Max)> OnApply { get; set; }
+
+    private static (string Label, decimal? Min, decimal? Max)[] Presets =>
+    [
+        ($"Hasta {10000m.ToMoney()}", null, 10000m),
+        ($"{10000m.ToMoney()} – {20000m.ToMoney()}", 10000m, 20000m),
+        ($"Más de {20000m.ToMoney()}", 20000m, null)
+    ];
+
+    protected override void OnParametersSet()
+    {
+        _min = Min;
+        _max = Max;
+    }
+
+    private async Task ApplyAsync(decimal? min, decimal? max)
+    {
+        _error = null;
+        if (min is < 0 || max is < 0)
+        {
+            _error = "Los precios no pueden ser negativos.";
+            return;
+        }
+        if (min is not null && max is not null && min > max)
+        {
+            _error = "El mínimo no puede ser mayor que el máximo.";
+            return;
+        }
+        _min = min;
+        _max = max;
+        await OnApply.InvokeAsync((min, max));
+    }
+}

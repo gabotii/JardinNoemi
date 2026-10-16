@@ -1,0 +1,65 @@
+@inject CartState CartState
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<Drawer Title="Tu carrito" IsOpen="CartState.IsDrawerOpen" IsOpenChanged="OnOpenChanged"
+        Footer="@(CartState.Cart.IsEmpty ? null : FooterContent)">
+    @if (!CartState.IsInitialized)
+    {
+        <LoadingSpinner Center="true" Label="Cargando tu carrito…" />
+    }
+    else if (CartState.Cart.IsEmpty)
+    {
+        <EmptyState Icon="bag" Title="Tu carrito está vacío" Text="Descubre plantas que harán más feliz tu hogar.">
+            <Actions>
+                <AppButton OnClick="@(() => Go("/tienda"))" IconEnd="arrow-right">Explorar la tienda</AppButton>
+            </Actions>
+        </EmptyState>
+    }
+    else
+    {
+        <div style="padding-top:var(--space-2)">
+            <FreeShippingProgress Subtotal="CartState.Cart.Subtotal" />
+        </div>
+        <ul role="list" aria-label="Productos en tu carrito" style="margin-top:var(--space-2)">
+            @foreach (var line in CartState.Cart.Lines)
+            {
+                <CartLineItem Line="line" @key="line.ProductId" />
+            }
+        </ul>
+    }
+</Drawer>
+
+@code {
+    private RenderFragment FooterContent => __builder =>
+    {
+        <dl class="summary-rows" style="margin-bottom:var(--space-4)">
+            <div class="summary-row summary-row--total" style="border:0;padding-top:0;margin-top:0">
+                <dt>Subtotal</dt>
+                <dd>@CartState.Cart.Subtotal.ToMoney()</dd>
+            </div>
+        </dl>
+        <p class="small muted" style="margin:0 0 var(--space-4)">Envío e impuestos calculados en el checkout.</p>
+        <div style="display:grid;gap:var(--space-2)">
+            <AppButton Block="true" Size="lg" IconEnd="arrow-right" Disabled="!CartState.Cart.CanCheckout" OnClick="@(() => Go("/checkout"))">Ir a pagar</AppButton>
+            <AppButton Block="true" Variant="ghost" OnClick="@(() => Go("/carrito"))">Ver carrito completo</AppButton>
+        </div>
+    };
+
+    protected override void OnInitialized() => CartState.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OnOpenChanged(bool open)
+    {
+        if (!open) CartState.CloseDrawer();
+    }
+
+    private void Go(string url)
+    {
+        CartState.CloseDrawer();
+        Navigation.NavigateTo(url);
+    }
+
+    public void Dispose() => CartState.Changed -= OnChanged;
+}

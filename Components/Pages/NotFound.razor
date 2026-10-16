@@ -1,0 +1,14 @@
+@page "/not-found"
+@layout MainLayout
+
+<SeoHead Title="Página no encontrada" Description="La página que buscas no existe o fue movida." NoIndex="true" />
+
+<div class="container status-page">
+    <span class="status-page__code" aria-hidden="true">404</span>
+    <h1 tabindex="-1">Esta planta no está en nuestro jardín</h1>
+    <p>La página que buscas no existe, cambió de lugar o el producto ya no está disponible.</p>
+    <div class="hero__actions" style="justify-content:center">
+        <AppButton Href="/tienda" IconEnd="arrow-right">Ir a la tienda</AppButton>
+        <AppButton Href="/" Variant="outline" IconStart="home">Volver al inicio</AppButton>
+    </div>
+</div>

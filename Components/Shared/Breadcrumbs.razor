@@ -1,0 +1,55 @@
+@using System.Text.Json
+@inject IOptions<ShopOptions> Store
+
+<nav class="breadcrumbs @Class" aria-label="Ruta de navegación">
+    <ol>
+        <li><a href="/">Inicio</a></li>
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            var isLast = i == Items.Count - 1;
+            <li>
+                @if (isLast || item.Href is null)
+                {
+                    <span aria-current="@(isLast ? "page" : null)">@item.Label</span>
+                }
+                else
+                {
+                    <a href="@item.Href">@item.Label</a>
+                }
+            </li>
+        }
+    </ol>
+</nav>
+@((MarkupString)JsonLd)
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Crumb> Items { get; set; } = [];
+    [Parameter] public string? Class { get; set; }
+
+    public sealed record Crumb(string Label, string? Href = null);
+
+    // Datos estructurados BreadcrumbList (schema.org) para resultados enriquecidos.
+    private string JsonLd
+    {
+        get
+        {
+            var baseUrl = Store.Value.BaseUrl.TrimEnd('/');
+            var elements = new List<object> { new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "Inicio", ["item"] = baseUrl + "/" } };
+            var position = 2;
+            foreach (var crumb in Items)
+            {
+                var entry = new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = position++, ["name"] = crumb.Label };
+                if (crumb.Href is not null) entry["item"] = baseUrl + crumb.Href;
+                elements.Add(entry);
+            }
+            var json = JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "BreadcrumbList",
+                ["itemListElement"] = elements
+            });
+            return $"<script type=\"application/ld+json\">{json}</script>";
+        }
+    }
+}

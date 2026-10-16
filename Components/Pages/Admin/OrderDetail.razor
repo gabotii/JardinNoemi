@@ -1,0 +1,167 @@
+@page "/admin/pedidos/{Id:int}"
+@inject IAdminOrderService AdminOrders
+@inject ToastService Toasts
+@inject IOptions<ShopOptions> Store
+
+<AdminPageHeader Title="@(_order is null ? "Pedido" : $"Pedido {_order.OrderNumber}")"
+                 Subtitle="@_order?.CreatedAt.ToLocalDateTime()">
+    <Actions>
+        <AppButton Href="/admin/pedidos" Variant="ghost" Size="sm" IconStart="arrow-left">Volver</AppButton>
+    </Actions>
+</AdminPageHeader>
+
+<div class="admin-content">
+    @if (!_loaded)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else if (_order is null)
+    {
+        <div class="panel"><EmptyState Icon="receipt" Title="Pedido no encontrado" /></div>
+    }
+    else
+    {
+        var o = _order;
+        <div class="detail-grid">
+            <div style="display:grid;gap:var(--space-6)">
+                <section class="panel">
+                    <div class="panel__header"><h2>Productos</h2><StatusPill Status="o.Status" /></div>
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th scope="col">Producto</th><th scope="col" class="num">Precio</th><th scope="col" class="num">Cant.</th><th scope="col" class="num">Total</th></tr></thead>
+                            <tbody>
+                                @foreach (var line in o.Lines)
+                                {
+                                    <tr>
+                                        <td><a href="/producto/@line.ProductSlug" target="_blank">@line.ProductName</a></td>
+                                        <td class="num">@line.UnitPrice.ToMoney()</td>
+                                        <td class="num">@line.Quantity</td>
+                                        <td class="num">@line.LineTotal.ToMoney()</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr><td colspan="3" class="num">Subtotal</td><td class="num">@o.Subtotal.ToMoney()</td></tr>
+                                <tr><td colspan="3" class="num">Envío</td><td class="num">@o.ShippingCost.ToMoney()</td></tr>
+                                <tr><td colspan="3" class="num"><strong>Total</strong></td><td class="num"><strong>@o.Total.ToMoney()</strong></td></tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel__header"><h2>Actualizar estado</h2></div>
+                    <div class="panel__body" style="display:grid;gap:var(--space-4)">
+                        @{ var next = AdminOrderService.NextStatuses(o.Status); }
+                        @if (next.Count == 0)
+                        {
+                            <p class="muted" style="margin:0">Este pedido está @OrderText.Status(o.Status).ToLowerInvariant() y no admite más cambios.</p>
+                        }
+                        else
+                        {
+                            <div class="status-actions">
+                                @foreach (var status in next)
+                                {
+                                    <AppButton Size="sm" Variant="@(status == OrderStatus.Cancelled ? "outline" : "primary")" Disabled="_busy"
+                                               OnClick="() => ChangeStatusAsync(status)">Marcar como @OrderText.Status(status).ToLowerInvariant()</AppButton>
+                                }
+                            </div>
+                        }
+                        @if (o.PaymentStatus == PaymentStatus.AwaitingTransfer && o.Status != OrderStatus.Cancelled)
+                        {
+                            <div class="notice notice--warning">
+                                <Icon Name="bank" />
+                                <div>
+                                    <strong>Esperando transferencia</strong>
+                                    Confirma el pago solo después de verificar el depósito en tu banco.
+                                    <div style="margin-top:var(--space-3)"><AppButton Size="sm" Disabled="_busy" IconStart="check" OnClick="() => ChangePaymentAsync(PaymentStatus.Paid)">Confirmar pago recibido</AppButton></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </section>
+            </div>
+
+            <div style="display:grid;gap:var(--space-6);align-content:start">
+                <section class="panel">
+                    <div class="panel__header"><h2>Cliente</h2></div>
+                    <div class="panel__body">
+                        <dl class="info-list">
+                            <div><dt>Nombre</dt><dd>@o.CustomerName</dd></div>
+                            <div><dt>Contacto</dt><dd><a href="mailto:@o.Email">@o.Email</a><br /><a href="tel:@o.Phone">@o.Phone</a></dd></div>
+                            <div>
+                                <dt>@OrderText.Delivery(o.DeliveryMethod)</dt>
+                                <dd>
+                                    @if (o.ShippingAddress is { } a)
+                                    {
+                                        @OrderText.AddressLine1(a)<br />@OrderText.AddressLine2(a)
+                                    }
+                                    else
+                                    {
+                                        @Store.Value.Address
+                                    }
+                                </dd>
+                            </div>
+                            @if (o.Notes is not null)
+                            {
+                                <div><dt>Notas</dt><dd>@o.Notes</dd></div>
+                            }
+                        </dl>
+                    </div>
+                </section>
+                <section class="panel">
+                    <div class="panel__header"><h2>Pago</h2><StatusPill Payment="o.PaymentStatus" /></div>
+                    <div class="panel__body">
+                        <dl class="info-list">
+                            <div><dt>Método</dt><dd>@OrderText.Method(o.PaymentMethod)</dd></div>
+                            <div><dt>Proveedor</dt><dd>@(o.PaymentProvider ?? "—")</dd></div>
+                            <div><dt>Referencia</dt><dd>@(o.PaymentReference ?? "—")</dd></div>
+                        </dl>
+                    </div>
+                </section>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private OrderDetailDto? _order;
+    private bool _loaded;
+    private bool _busy;
+
+    [Parameter] public int Id { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _order = await AdminOrders.GetOrderAsync(Id);
+        _loaded = true;
+    }
+
+    private async Task ChangeStatusAsync(OrderStatus status)
+    {
+        _busy = true;
+        try
+        {
+            var result = await AdminOrders.UpdateStatusAsync(Id, status);
+            if (result.Success) Toasts.Success("Estado actualizado", OrderText.Status(status));
+            else Toasts.Error("No se pudo actualizar", result.Error);
+            await LoadAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task ChangePaymentAsync(PaymentStatus status)
+    {
+        _busy = true;
+        try
+        {
+            var result = await AdminOrders.UpdatePaymentStatusAsync(Id, status);
+            if (result.Success) Toasts.Success("Pago actualizado", OrderText.Payment(status));
+            else Toasts.Error("No se pudo actualizar", result.Error);
+            await LoadAsync();
+        }
+        finally { _busy = false; }
+    }
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img"><title>Imagen no disponible</title>
+  <rect width="800" height="800" fill="#F3ECE0"/>
+  <path d="M290 560V380a110 110 0 0 1 220 0v180" fill="none" stroke="#D9C6A5" stroke-width="18" stroke-linecap="round"/>
+  <path d="M400 550V420" stroke="#D9C6A5" stroke-width="16" stroke-linecap="round"/>
+  <path d="M400 480c-44 0-70-26-70-68 44 0 70 26 70 68Z" fill="#D9C6A5"/>
+  <path d="M400 450c0-42 26-70 70-70 0 43-27 70-70 70Z" fill="#E9DCC6"/>
+</svg>

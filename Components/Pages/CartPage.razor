@@ -1,0 +1,107 @@
+@page "/carrito"
+@inject CartState CartState
+@inject IShippingCalculator Shipping
+@implements IDisposable
+
+<SeoHead Title="Tu carrito" Description="Revisa los productos de tu carrito en JardinNoemi." NoIndex="true" />
+
+<div class="page-hero">
+    <div class="container">
+        <Breadcrumbs Items="@([new("Carrito")])" />
+        <h1 tabindex="-1">Tu carrito</h1>
+        @if (CartState.IsInitialized && !CartState.Cart.IsEmpty)
+        {
+            <p class="lead">@CartState.Cart.ItemCount.Pluralize("producto listo", "productos listos") para llegar a tu casa.</p>
+        }
+    </div>
+</div>
+
+<div class="container">
+    @if (!CartState.IsInitialized)
+    {
+        <div class="cart-layout" aria-busy="true">
+            <div class="card cart-layout__items">
+                @for (var i = 0; i < 3; i++)
+                {
+                    <div class="cart-line cart-line--lg">
+                        <span class="skeleton cart-line__media"></span>
+                        <div><span class="skeleton skeleton--title"></span><span class="skeleton skeleton--text" style="width:40%"></span></div>
+                    </div>
+                }
+            </div>
+            <span class="skeleton" style="height:320px;border-radius:var(--radius-lg)"></span>
+        </div>
+    }
+    else if (CartState.Cart.IsEmpty)
+    {
+        <EmptyState Icon="bag" Title="Tu carrito está vacío"
+                    Text="Aún no agregas plantas. Te ayudamos a encontrar la ideal para tu espacio y tu ritmo.">
+            <Actions>
+                <AppButton Href="/tienda" IconEnd="arrow-right">Explorar la tienda</AppButton>
+                <AppButton Href="/tienda?oferta=true" Variant="outline">Ver ofertas</AppButton>
+            </Actions>
+        </EmptyState>
+    }
+    else
+    {
+        var cart = CartState.Cart;
+        <div class="cart-layout">
+            <div>
+                <div class="card cart-layout__items">
+                    <ul role="list" aria-label="Productos en tu carrito">
+                        @foreach (var line in cart.Lines)
+                        {
+                            <CartLineItem Line="line" Large="true" @key="line.ProductId" />
+                        }
+                    </ul>
+                </div>
+                <a class="continue-link" href="/tienda"><Icon Name="arrow-left" Class="icon--sm" /> Seguir comprando</a>
+            </div>
+
+            <aside class="cart-layout__aside" aria-label="Resumen del pedido">
+                <div class="summary-card">
+                    <h2>Resumen</h2>
+                    <div style="margin-bottom:var(--space-5)">
+                        <FreeShippingProgress Subtotal="cart.Subtotal" />
+                    </div>
+                    <CartSummary Subtotal="cart.Subtotal" ItemCount="cart.ItemCount" Quote="EstimatedQuote(cart.Subtotal)" />
+                    @if (!cart.CanCheckout)
+                    {
+                        <div class="notice notice--warning" role="alert" style="margin-top:var(--space-4)">
+                            <Icon Name="alert" />
+                            <span>Hay productos sin stock suficiente. Ajusta las cantidades para continuar.</span>
+                        </div>
+                    }
+                    <div style="margin-top:var(--space-6)">
+                        <AppButton Href="@(cart.CanCheckout ? "/checkout" : null)" Disabled="!cart.CanCheckout" Block="true" Size="lg" IconEnd="arrow-right">Continuar al pago</AppButton>
+                    </div>
+                    <ul class="trust-list">
+                        <li><Icon Name="lock" /> Pago seguro y datos protegidos</li>
+                        <li><Icon Name="shield" /> Garantía de llegada de 7 días</li>
+                        <li><Icon Name="store" /> Retiro gratis en nuestro taller</li>
+                    </ul>
+                </div>
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => CartState.Changed += OnChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await CartState.EnsureInitializedAsync();
+    }
+
+    /// <summary>En el carrito aún no se conoce la región: solo se confirma si el envío ya es gratis.</summary>
+    private ShippingQuote? EstimatedQuote(decimal subtotal)
+    {
+        var quote = Shipping.Quote(subtotal, DeliveryMethod.HomeDelivery, null);
+        return quote.IsFree ? quote : null;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => CartState.Changed -= OnChanged;
+}

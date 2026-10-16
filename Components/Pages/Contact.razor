@@ -1,0 +1,135 @@
+@page "/contacto"
+@inject IContactService ContactService
+@inject IOptions<ShopOptions> Options
+
+<SeoHead Title="Contacto" Description="Escríbenos para asesoría de plantas, pedidos corporativos o consultas sobre tu compra. Respondemos en menos de 24 horas hábiles." />
+
+<div class="page-hero">
+    <div class="container">
+        <Breadcrumbs Items="@([new("Contacto")])" />
+        <h1 tabindex="-1">Conversemos</h1>
+        <p class="lead">¿Dudas sobre qué planta elegir, un pedido para tu empresa o el estado de tu compra? Respondemos en menos de 24 horas hábiles.</p>
+    </div>
+</div>
+
+<div class="container contact-layout">
+    <section class="card card--pad" aria-labelledby="form-title">
+        @if (_sent)
+        {
+            <div class="success-panel" role="status">
+                <span class="confirmation__check" aria-hidden="true"><Icon Name="check" /></span>
+                <h2 id="form-title" style="margin:0">¡Mensaje enviado!</h2>
+                <p class="muted" style="margin:0">Gracias por escribirnos, @_sentName. Te responderemos a la brevedad en tu correo.</p>
+                <AppButton Variant="outline" OnClick="Reset">Enviar otro mensaje</AppButton>
+            </div>
+        }
+        else
+        {
+            <h2 id="form-title">Envíanos un mensaje</h2>
+            @if (_error is not null)
+            {
+                <div class="notice notice--danger" role="alert" style="margin-bottom:var(--space-5)">
+                    <Icon Name="alert" /><span>@_error</span>
+                </div>
+            }
+            <EditForm Model="_form" OnValidSubmit="SubmitAsync">
+                <DataAnnotationsValidator />
+                <div class="form-grid">
+                    <div class="field span-3">
+                        <label class="field__label" for="c-name">Nombre</label>
+                        <InputText id="c-name" @bind-Value="_form.Name" autocomplete="name" aria-required="true" />
+                        <ValidationMessage For="() => _form.Name" />
+                    </div>
+                    <div class="field span-3">
+                        <label class="field__label" for="c-email">Correo electrónico</label>
+                        <InputText id="c-email" type="email" @bind-Value="_form.Email" autocomplete="email" aria-required="true" />
+                        <ValidationMessage For="() => _form.Email" />
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="c-phone">Teléfono <span class="optional">(opcional)</span></label>
+                        <InputText id="c-phone" type="tel" @bind-Value="_form.Phone" autocomplete="tel" placeholder="+56 9 1234 5678" />
+                        <ValidationMessage For="() => _form.Phone" />
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="c-message">Mensaje</label>
+                        <InputTextArea id="c-message" @bind-Value="_form.Message" rows="6" aria-required="true" aria-describedby="c-message-hint" />
+                        <span class="field__hint" id="c-message-hint">Si tu consulta es sobre un pedido, incluye su número (p. ej. JN-260101-ABCD).</span>
+                        <ValidationMessage For="() => _form.Message" />
+                    </div>
+                    <div>
+                        <AppButton Type="submit" Size="lg" IconEnd="send" Loading="_sending" LoadingText="Enviando…">Enviar mensaje</AppButton>
+                    </div>
+                </div>
+            </EditForm>
+        }
+    </section>
+
+    <aside class="contact-cards" aria-label="Otros canales de contacto">
+        <a class="contact-card" href="@($"https://wa.me/{Store.WhatsApp}")" target="_blank" rel="noopener noreferrer">
+            <span class="contact-card__icon"><Icon Name="message" /></span>
+            <span><h3>WhatsApp</h3><p>@Store.Phone · la vía más rápida</p></span>
+        </a>
+        <a class="contact-card" href="mailto:@Store.Email">
+            <span class="contact-card__icon"><Icon Name="mail" /></span>
+            <span><h3>Correo</h3><p>@Store.Email</p></span>
+        </a>
+        <div class="contact-card">
+            <span class="contact-card__icon"><Icon Name="map-pin" /></span>
+            <span><h3>Taller y retiros</h3><p>@Store.Address</p></span>
+        </div>
+        <div class="contact-card">
+            <span class="contact-card__icon"><Icon Name="clock" /></span>
+            <span><h3>Horario</h3><p>@Store.OpeningHours</p></span>
+        </div>
+        <div class="contact-card">
+            <span class="contact-card__icon"><Icon Name="instagram" /></span>
+            <span>
+                <h3>Síguenos</h3>
+                <p>
+                    <a href="@Store.Instagram" target="_blank" rel="noopener noreferrer">Instagram</a> ·
+                    <a href="@Store.Facebook" target="_blank" rel="noopener noreferrer">Facebook</a> ·
+                    <a href="@Store.TikTok" target="_blank" rel="noopener noreferrer">TikTok</a>
+                </p>
+            </span>
+        </div>
+    </aside>
+</div>
+
+@code {
+    private ContactForm _form = new();
+    private bool _sending;
+    private bool _sent;
+    private string? _sentName;
+    private string? _error;
+
+    private ShopOptions Store => Options.Value;
+
+    private async Task SubmitAsync()
+    {
+        _sending = true;
+        _error = null;
+        try
+        {
+            var result = await ContactService.SendAsync(_form);
+            if (result.Success)
+            {
+                _sentName = _form.Name.Split(' ')[0];
+                _sent = true;
+            }
+            else
+            {
+                _error = result.Error;
+            }
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private void Reset()
+    {
+        _form = new ContactForm();
+        _sent = false;
+    }
+}

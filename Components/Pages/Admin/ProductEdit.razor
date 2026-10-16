@@ -1,0 +1,278 @@
+@page "/admin/productos/nuevo"
+@page "/admin/productos/{Id:int}"
+@inject IAdminCatalogService AdminCatalog
+@inject IImageStorage ImageStorage
+@inject IOptions<StorageOptions> StorageOptions
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+@inject ILogger<ProductEdit> Logger
+
+<AdminPageHeader Title="@(IsNew ? "Nuevo producto" : _model?.Name ?? "Editar producto")"
+                 Subtitle="@(IsNew ? "Completa la ficha y publícalo cuando esté listo." : "Los cambios se reflejan de inmediato en la tienda.")">
+    <Actions>
+        <AppButton Href="/admin/productos" Variant="ghost" Size="sm" IconStart="arrow-left">Volver</AppButton>
+        @if (!IsNew && _model is not null)
+        {
+            <AppButton Href="@($"/producto/{_model.Slug}")" Variant="outline" Size="sm" IconStart="external" target="_blank">Ver en tienda</AppButton>
+        }
+    </Actions>
+</AdminPageHeader>
+
+<div class="admin-content">
+    @if (_notFound)
+    {
+        <div class="panel"><EmptyState Icon="search" Title="Producto no encontrado" /></div>
+    }
+    else if (_model is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="SaveAsync" class="admin-form">
+            <DataAnnotationsValidator />
+            <div style="display:grid;gap:var(--space-6)">
+                @if (_error is not null)
+                {
+                    <div class="notice notice--danger" role="alert"><Icon Name="alert" /><span>@_error</span></div>
+                }
+                <section class="panel">
+                    <div class="panel__header"><h2>Información</h2></div>
+                    <div class="panel__body form-grid">
+                        <div class="field span-4">
+                            <label class="field__label" for="pe-name">Nombre</label>
+                            <InputText id="pe-name" @bind-Value="_model.Name" @bind-Value:after="SuggestSlug" />
+                            <ValidationMessage For="() => _model.Name" />
+                        </div>
+                        <div class="field span-2">
+                            <label class="field__label" for="pe-sku">SKU</label>
+                            <InputText id="pe-sku" @bind-Value="_model.Sku" />
+                            <ValidationMessage For="() => _model.Sku" />
+                        </div>
+                        <div class="field span-3">
+                            <label class="field__label" for="pe-slug">URL (slug)</label>
+                            <InputText id="pe-slug" @bind-Value="_model.Slug" aria-describedby="pe-slug-hint" />
+                            <span class="field__hint" id="pe-slug-hint">/producto/@_model.Slug</span>
+                            <ValidationMessage For="() => _model.Slug" />
+                        </div>
+                        <div class="field span-3">
+                            <label class="field__label" for="pe-cat">Categoría</label>
+                            <InputSelect id="pe-cat" @bind-Value="_model.CategoryId">
+                                <option value="0">Selecciona…</option>
+                                @foreach (var c in _categories)
+                                {
+                                    <option value="@c.Id">@c.Name</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => _model.CategoryId" />
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="pe-short">Descripción corta</label>
+                            <InputText id="pe-short" @bind-Value="_model.ShortDescription" />
+                            <ValidationMessage For="() => _model.ShortDescription" />
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="pe-desc">Descripción completa</label>
+                            <InputTextArea id="pe-desc" @bind-Value="_model.Description" rows="7" aria-describedby="pe-desc-hint" />
+                            <span class="field__hint" id="pe-desc-hint">Separa los párrafos con una línea en blanco.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel__header"><h2>Imágenes</h2></div>
+                    <div class="panel__body image-editor">
+                        @for (var i = 0; i < _model.Images.Count; i++)
+                        {
+                            var index = i;
+                            var image = _model.Images[index];
+                            <div class="image-editor__row">
+                                <img src="@image.Url" alt="" width="56" height="56" />
+                                <div class="image-editor__fields field">
+                                    <label class="visually-hidden" for="@($"img-url-{index}")">URL de imagen @(index + 1)</label>
+                                    <InputText id="@($"img-url-{index}")" @bind-Value="image.Url" placeholder="/images/... o https://..." />
+                                    <label class="visually-hidden" for="@($"img-alt-{index}")">Texto alternativo @(index + 1)</label>
+                                    <InputText id="@($"img-alt-{index}")" @bind-Value="image.AltText" placeholder="Texto alternativo (accesibilidad)" />
+                                </div>
+                                <div style="display:grid;gap:2px">
+                                    <AppButton Variant="ghost" Size="sm" IconOnly="true" AriaLabel="Mover antes" Disabled="index == 0" OnClick="() => Move(index, -1)"><Icon Name="chevron-up" Class="icon--sm" /></AppButton>
+                                    <AppButton Variant="ghost" Size="sm" IconOnly="true" AriaLabel="Quitar imagen" OnClick="() => _model.Images.RemoveAt(index)"><Icon Name="trash" Class="icon--sm" /></AppButton>
+                                </div>
+                            </div>
+                        }
+                        <div class="upload-drop">
+                            <Icon Name="upload" />
+                            <span>Sube JPG, PNG o WebP (máx. @(StorageOptions.Value.MaxImageBytes / 1024 / 1024) MB) o agrega una URL.</span>
+                            <label class="visually-hidden" for="pe-upload">Subir imágenes</label>
+                            <InputFile id="pe-upload" OnChange="UploadAsync" accept="image/jpeg,image/png,image/webp" multiple />
+                            @if (_uploading) { <LoadingSpinner Label="Subiendo…" /> }
+                            <AppButton Variant="ghost" Size="sm" IconStart="plus" OnClick="() => _model.Images.Add(new ProductImageEdit())">Agregar URL</AppButton>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel__header"><h2>Ficha de cuidados <span class="small muted" style="font-family:var(--font-body)">(opcional)</span></h2></div>
+                    <div class="panel__body form-grid">
+                        <div class="field span-3"><label class="field__label" for="pe-light">Luz</label><InputText id="pe-light" @bind-Value="_model.Light" placeholder="Luz indirecta brillante" /></div>
+                        <div class="field span-3"><label class="field__label" for="pe-water">Riego</label><InputText id="pe-water" @bind-Value="_model.Watering" placeholder="Cada 7 a 10 días" /></div>
+                        <div class="field span-2"><label class="field__label" for="pe-size">Tamaño</label><InputText id="pe-size" @bind-Value="_model.Size" /></div>
+                        <div class="field span-2">
+                            <label class="field__label" for="pe-care">Nivel de cuidado</label>
+                            <InputSelect id="pe-care" @bind-Value="_model.CareLevel">
+                                <option value="">No aplica</option>
+                                @foreach (var level in Enum.GetValues<CareLevel>())
+                                {
+                                    <option value="@level">@OrderText.Care(level)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="field span-2">
+                            <label class="field__label" for="pe-pet">Mascotas</label>
+                            <select id="pe-pet" class="input" value="@PetValue" @onchange="OnPetChanged">
+                                <option value="">No aplica</option>
+                                <option value="true">Segura para mascotas</option>
+                                <option value="false">Tóxica para mascotas</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <aside class="admin-form__aside">
+                <section class="panel">
+                    <div class="panel__header"><h2>Precio y stock</h2></div>
+                    <div class="panel__body form-grid">
+                        <div class="field">
+                            <label class="field__label" for="pe-price">Precio de venta</label>
+                            <InputNumber id="pe-price" @bind-Value="_model.Price" min="0" step="10" />
+                            <ValidationMessage For="() => _model.Price" />
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="pe-compare">Precio anterior <span class="optional">(para mostrar oferta)</span></label>
+                            <InputNumber id="pe-compare" @bind-Value="_model.CompareAtPrice" min="0" step="10" />
+                            <ValidationMessage For="() => _model.CompareAtPrice" />
+                        </div>
+                        <div class="field">
+                            <label class="field__label" for="pe-stock">Stock</label>
+                            <InputNumber id="pe-stock" @bind-Value="_model.Stock" min="0" />
+                            <ValidationMessage For="() => _model.Stock" />
+                        </div>
+                    </div>
+                </section>
+                <section class="panel">
+                    <div class="panel__header"><h2>Visibilidad</h2></div>
+                    <div class="panel__body" style="display:grid;gap:var(--space-3)">
+                        <label class="checkbox"><InputCheckbox @bind-Value="_model.IsActive" /> Visible en la tienda</label>
+                        <label class="checkbox"><InputCheckbox @bind-Value="_model.IsFeatured" /> Destacado en el inicio</label>
+                    </div>
+                </section>
+                <AppButton Type="submit" Size="lg" Block="true" Loading="_saving" LoadingText="Guardando…" IconStart="check">
+                    @(IsNew ? "Crear producto" : "Guardar cambios")
+                </AppButton>
+            </aside>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private ProductEditModel? _model;
+    private IReadOnlyList<CategoryEditModel> _categories = [];
+    private bool _saving;
+    private bool _uploading;
+    private bool _notFound;
+    private string? _error;
+    private string? _lastAutoSlug;
+
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsNew => Id is null;
+
+    private string PetValue => _model?.IsPetFriendly switch { true => "true", false => "false", _ => "" };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _categories = await AdminCatalog.GetCategoriesAsync();
+        if (IsNew)
+        {
+            _model = new ProductEditModel { IsActive = false };
+            return;
+        }
+
+        _model = await AdminCatalog.GetProductForEditAsync(Id!.Value);
+        _notFound = _model is null;
+    }
+
+    private void SuggestSlug()
+    {
+        if (_model is null) return;
+        // Solo en productos nuevos y mientras el slug no haya sido editado a mano.
+        if (IsNew && (string.IsNullOrEmpty(_model.Slug) || _model.Slug == _lastAutoSlug))
+        {
+            _model.Slug = CatalogService.Slugify(_model.Name);
+            _lastAutoSlug = _model.Slug;
+        }
+    }
+
+    private void OnPetChanged(ChangeEventArgs e) =>
+        _model!.IsPetFriendly = e.Value?.ToString() switch { "true" => true, "false" => false, _ => null };
+
+    private void Move(int index, int delta)
+    {
+        var target = index + delta;
+        if (_model is null || target < 0 || target >= _model.Images.Count) return;
+        (_model.Images[index], _model.Images[target]) = (_model.Images[target], _model.Images[index]);
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        if (_model is null) return;
+        _uploading = true;
+        _error = null;
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(8))
+            {
+                try
+                {
+                    await using var stream = file.OpenReadStream(StorageOptions.Value.MaxImageBytes);
+                    var url = await ImageStorage.SaveAsync(stream, file.Name, file.ContentType);
+                    _model.Images.Add(new ProductImageEdit { Url = url, AltText = _model.Name });
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or IOException)
+                {
+                    Logger.LogWarning(ex, "Imagen rechazada: {File}", file.Name);
+                    Toasts.Error($"No se pudo subir {file.Name}", ex is IOException ? "El archivo supera el tamaño permitido." : ex.Message);
+                }
+            }
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_model is null) return;
+        _saving = true;
+        _error = null;
+        try
+        {
+            var wasNew = IsNew;
+            var result = await AdminCatalog.SaveProductAsync(_model);
+            if (!result.Success)
+            {
+                _error = result.Error;
+                return;
+            }
+
+            Toasts.Success(wasNew ? "Producto creado" : "Cambios guardados", _model.Name);
+            if (wasNew) Navigation.NavigateTo($"/admin/productos/{_model.Id}", replace: true);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

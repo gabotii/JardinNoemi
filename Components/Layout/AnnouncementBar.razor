@@ -1,0 +1,15 @@
+@inject IOptionsMonitor<ShippingOptions> Shipping
+
+<div class="announcement">
+    <div class="container announcement__inner">
+        <p class="announcement__item" style="margin:0">
+            <Icon Name="truck" /> Despacho <strong>gratis</strong> sobre @Shipping.CurrentValue.FreeShippingThreshold.ToMoney()
+        </p>
+        <p class="announcement__item announcement__item--secondary" style="margin:0">
+            <Icon Name="sprout" /> Plantas cuidadas a mano en nuestro vivero
+        </p>
+        <p class="announcement__item announcement__item--secondary" style="margin:0">
+            <Icon Name="shield" /> Garantía de llegada: 7 días
+        </p>
+    </div>
+</div>

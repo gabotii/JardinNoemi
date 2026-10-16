@@ -1,0 +1,85 @@
+@inject CartState CartState
+@inject ToastService Toasts
+
+<article class="product-card @(Product.InStock ? null : "product-card--soldout")">
+    <div class="product-card__media">
+        <img class="product-card__img" src="@(Product.ImageUrl ?? "/images/brand/placeholder.svg")" alt="@(Product.ImageAlt ?? Product.Name)"
+             width="600" height="600" loading="@(Priority ? "eager" : "lazy")" decoding="async" fetchpriority="@(Priority ? "high" : null)" />
+        <div class="product-card__badges">
+            @if (!Product.InStock)
+            {
+                <span class="badge badge--soldout">Agotado</span>
+            }
+            else if (Product.IsOnSale)
+            {
+                <span class="badge badge--sale">-@Product.DiscountPercent%</span>
+            }
+            @if (Product.IsLowStock)
+            {
+                <span class="badge badge--low">Últimas @Product.Stock</span>
+            }
+        </div>
+        <div class="product-card__quick">
+            <AppButton Href="@DetailUrl" Variant="light" Size="sm" Block="true" IconStart="eye" tabindex="-1" aria-hidden="true">Ver detalle</AppButton>
+        </div>
+    </div>
+    <div class="product-card__body">
+        <span class="product-card__category">@Product.CategoryName</span>
+        @if (HeadingLevel == 2)
+        {
+            <h2 class="product-card__title"><a href="@DetailUrl">@Product.Name</a></h2>
+        }
+        else
+        {
+            <h3 class="product-card__title"><a href="@DetailUrl">@Product.Name</a></h3>
+        }
+        <p class="product-card__desc">@Product.ShortDescription</p>
+        <StarRating Value="Product.Rating" Count="Product.ReviewCount" />
+        <div class="product-card__footer">
+            <PriceTag Price="Product.Price" CompareAt="Product.CompareAtPrice" />
+            @if (Product.InStock)
+            {
+                <AppButton Variant="soft" Size="sm" IconStart="bag" Loading="_adding" LoadingText="Agregando"
+                           OnClick="AddAsync" AriaLabel="@($"Agregar {Product.Name} al carrito")">Agregar</AppButton>
+            }
+            else
+            {
+                <AppButton Variant="ghost" Size="sm" Href="@DetailUrl" AriaLabel="@($"Ver {Product.Name}")">Ver</AppButton>
+            }
+        </div>
+    </div>
+</article>
+
+@code {
+    private bool _adding;
+
+    [Parameter, EditorRequired] public ProductCardDto Product { get; set; } = default!;
+
+    /// <summary>Carga prioritaria para imágenes visibles al cargar (mejora LCP).</summary>
+    [Parameter] public bool Priority { get; set; }
+
+    [Parameter] public int HeadingLevel { get; set; } = 3;
+
+    private string DetailUrl => $"/producto/{Product.Slug}";
+
+    private async Task AddAsync()
+    {
+        _adding = true;
+        try
+        {
+            var result = await CartState.AddAsync(Product.Id);
+            if (!result.Success)
+            {
+                Toasts.Error("No pudimos agregarlo", result.Message);
+            }
+            else if (result.Message is not null)
+            {
+                Toasts.Warning("Stock limitado", result.Message);
+            }
+        }
+        finally
+        {
+            _adding = false;
+        }
+    }
+}

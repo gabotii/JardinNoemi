@@ -1,0 +1,106 @@
+@page "/admin/inventario"
+@inject IAdminCatalogService AdminCatalog
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+
+<AdminPageHeader Title="Inventario" Subtitle="Ajusta el stock disponible. Los pedidos descuentan unidades automáticamente." />
+
+<div class="admin-content">
+    <div class="admin-toolbar">
+        <div class="search" role="search">
+            <Icon Name="search" />
+            <label class="visually-hidden" for="inv-search">Buscar productos</label>
+            <input id="inv-search" type="search" placeholder="Nombre o SKU" value="@Q" @onchange="Search" />
+        </div>
+        <div class="segmented" role="group" aria-label="Filtro de stock">
+            <a href="@Url(Q, false)" aria-current="@(Bajo != true ? "page" : null)">Todos</a>
+            <a href="@Url(Q, true)" aria-current="@(Bajo == true ? "page" : null)">Stock bajo (≤ @AdminCatalogService.LowStockThreshold)</a>
+        </div>
+    </div>
+
+    @if (_items is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="panel"><EmptyState Icon="warehouse" Title="Nada por aquí" Text="No hay productos con estos filtros." /></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col"><span class="visually-hidden">Imagen</span></th>
+                        <th scope="col">Producto</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col" class="num">Stock actual</th>
+                        <th scope="col">Ajustar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr @key="item.ProductId">
+                            <td><img class="thumb" src="@(item.ImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="44" height="44" loading="lazy" /></td>
+                            <td><a href="/admin/productos/@item.ProductId"><strong>@item.Name</strong></a><br /><span class="small muted">@item.Sku</span></td>
+                            <td><span class="pill @(item.IsActive ? "pill--success" : "pill--neutral")">@(item.IsActive ? "Visible" : "Oculto")</span></td>
+                            <td class="num"><span class="@(item.Stock == 0 ? "stock-out" : item.Stock <= AdminCatalogService.LowStockThreshold ? "stock-low" : null)">@item.Stock</span></td>
+                            <td>
+                                <div class="stock-input">
+                                    <label class="visually-hidden" for="@($"stock-{item.ProductId}")">Nuevo stock de @item.Name</label>
+                                    <input id="@($"stock-{item.ProductId}")" type="number" min="0" max="100000" inputmode="numeric"
+                                           value="@Draft(item)" @onchange="e => SetDraft(item.ProductId, e)" />
+                                    <AppButton Size="sm" Variant="soft" Disabled="!_drafts.ContainsKey(item.ProductId)" OnClick="() => SaveAsync(item)">Guardar</AppButton>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<InventoryItem>? _items;
+    private readonly Dictionary<int, int> _drafts = [];
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "bajo")] public bool? Bajo { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _items = await AdminCatalog.GetInventoryAsync(Q, Bajo == true);
+        _drafts.Clear();
+    }
+
+    private int Draft(InventoryItem item) => _drafts.TryGetValue(item.ProductId, out var value) ? value : item.Stock;
+
+    private void SetDraft(int productId, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value) && value >= 0) _drafts[productId] = value;
+    }
+
+    private async Task SaveAsync(InventoryItem item)
+    {
+        if (!_drafts.TryGetValue(item.ProductId, out var stock)) return;
+        var result = await AdminCatalog.UpdateStockAsync(item.ProductId, stock);
+        if (result.Success) Toasts.Success("Stock actualizado", $"{item.Name}: {stock} unidades");
+        else Toasts.Error("No se pudo actualizar", result.Error);
+        await LoadAsync();
+    }
+
+    private static string Url(string? q, bool low)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(q)) parts.Add($"q={Uri.EscapeDataString(q)}");
+        if (low) parts.Add("bajo=true");
+        return parts.Count == 0 ? "/admin/inventario" : $"/admin/inventario?{string.Join('&', parts)}";
+    }
+
+    private void Search(ChangeEventArgs e) => Navigation.NavigateTo(Url(e.Value?.ToString(), Bajo == true), replace: true);
+}

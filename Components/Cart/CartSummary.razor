@@ -1,0 +1,35 @@
+<dl class="summary-rows">
+    <div class="summary-row">
+        <dt>Subtotal (@ItemCount.Pluralize("producto", "productos"))</dt>
+        <dd>@Subtotal.ToMoney()</dd>
+    </div>
+    <div class="summary-row">
+        <dt>Envío</dt>
+        <dd>
+            @if (Quote is null)
+            {
+                <span class="muted" style="font-weight:500">Se calcula en el checkout</span>
+            }
+            else if (Quote.IsFree)
+            {
+                <span class="summary-free">Gratis</span>
+            }
+            else
+            {
+                @Quote.Cost.ToMoney()
+            }
+        </dd>
+    </div>
+    <div class="summary-row summary-row--total">
+        <dt>Total</dt>
+        <dd>@((Subtotal + (Quote?.Cost ?? 0)).ToMoney())</dd>
+    </div>
+</dl>
+
+@code {
+    [Parameter] public decimal Subtotal { get; set; }
+    [Parameter] public int ItemCount { get; set; }
+
+    /// <summary>Si es null se muestra "se calcula en el checkout" (aún no se conoce la región).</summary>
+    [Parameter] public ShippingQuote? Quote { get; set; }
+}

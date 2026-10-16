@@ -1,0 +1,58 @@
+@inherits LayoutComponentBase
+
+<SvgSprites />
+<a class="skip-link" href="/admin#contenido-admin">Saltar al contenido</a>
+
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <BrandLogo ShowTagline="false" />
+        <span class="admin-sidebar__label">Administración</span>
+        <nav aria-label="Administración">
+            <ul class="admin-nav">
+                <li><NavLink href="/admin" Match="NavLinkMatch.All"><Icon Name="grid" /> Resumen</NavLink></li>
+                <li><NavLink href="/admin/pedidos"><Icon Name="receipt" /> Pedidos</NavLink></li>
+                <li><NavLink href="/admin/productos"><Icon Name="sprout" /> Productos</NavLink></li>
+                <li><NavLink href="/admin/categorias"><Icon Name="tag" /> Categorías</NavLink></li>
+                <li><NavLink href="/admin/inventario"><Icon Name="warehouse" /> Inventario</NavLink></li>
+                <li><NavLink href="/admin/clientes"><Icon Name="users" /> Clientes</NavLink></li>
+            </ul>
+        </nav>
+        <div class="admin-sidebar__footer">
+            <a href="/" target="_blank" rel="noopener">Ver tienda ↗</a>
+            <form action="/cuenta/salir" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="returnUrl" value="/" />
+                <button type="submit" class="btn btn--link" style="--btn-fg:var(--sage-200)">Cerrar sesión</button>
+            </form>
+        </div>
+    </aside>
+    <div class="admin-main" id="contenido-admin">
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>@Body</ChildContent>
+            <ErrorContent>
+                <div class="admin-content">
+                    <div class="notice notice--danger" role="alert">
+                        <Icon Name="alert" />
+                        <div><strong>Ocurrió un error.</strong> Revisa los registros del servidor para más detalles.</div>
+                    </div>
+                    <div><AppButton OnClick="() => _errorBoundary?.Recover()" IconStart="refresh">Reintentar</AppButton></div>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
+    </div>
+</div>
+
+@if (RendererInfo.IsInteractive)
+{
+    <ToastHost />
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocurrió un error inesperado.
+    <a href="." class="reload">Recargar</a>
+    <span class="dismiss" role="button" aria-label="Cerrar">✕</span>
+</div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+}

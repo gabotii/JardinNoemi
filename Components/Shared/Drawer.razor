@@ -1,0 +1,68 @@
+@* Panel lateral basado en <dialog> modal (foco atrapado, Escape, fondo inerte). *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<dialog @ref="_dialog" class="drawer @(Side == "left" ? "drawer--left" : null) @Class" aria-labelledby="@_titleId" data-light-dismiss @onclose="OnDialogClosed">
+    <div class="drawer__header">
+        <h2 id="@_titleId">@Title</h2>
+        <button type="button" class="icon-btn" aria-label="Cerrar" @onclick="CloseAsync">
+            <Icon Name="x" />
+        </button>
+    </div>
+    <div class="drawer__body">
+        @if (IsOpen || KeepContent)
+        {
+            @ChildContent
+        }
+    </div>
+    @if (Footer is not null)
+    {
+        <div class="drawer__footer">@Footer</div>
+    }
+</dialog>
+
+@code {
+    private readonly string _titleId = $"drawer-{Guid.NewGuid():N}"[..15];
+    private ElementReference _dialog;
+    private bool _renderedOpen;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public string Side { get; set; } = "right";
+    [Parameter] public bool KeepContent { get; set; } = true;
+    [Parameter] public string? Class { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (IsOpen == _renderedOpen) return;
+        _renderedOpen = IsOpen;
+        try
+        {
+            await JS.InvokeVoidAsync(IsOpen ? "jn.showModal" : "jn.closeModal", _dialog);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async Task CloseAsync()
+    {
+        if (!IsOpen) return;
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task OnDialogClosed()
+    {
+        _renderedOpen = false;
+        await CloseAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_renderedOpen) return;
+        try { await JS.InvokeVoidAsync("jn.closeModal", _dialog); }
+        catch (JSDisconnectedException) { }
+    }
+}

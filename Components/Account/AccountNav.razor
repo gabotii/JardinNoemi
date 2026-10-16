@@ -1,0 +1,13 @@
+<nav class="account-nav" aria-label="Mi cuenta">
+    <NavLink href="/cuenta/perfil"><Icon Name="user" /> Mis datos</NavLink>
+    <NavLink href="/cuenta/pedidos"><Icon Name="receipt" /> Mis pedidos</NavLink>
+    <NavLink href="/cuenta/contrasena"><Icon Name="lock" /> Contraseña</NavLink>
+    <AuthorizeView Policy="@Policies.Admin">
+        <NavLink href="/admin"><Icon Name="grid" /> Administración</NavLink>
+    </AuthorizeView>
+    <form action="/cuenta/salir" method="post">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="/" />
+        <button type="submit"><Icon Name="logout" /> Cerrar sesión</button>
+    </form>
+</nav>

@@ -1,0 +1,32 @@
+<section class="empty-state @Class" aria-labelledby="@_id">
+    <div class="empty-state__art" aria-hidden="true">
+        <Icon Name="@Icon" />
+    </div>
+    @if (HeadingLevel == 1)
+    {
+        <h1 id="@_id">@Title</h1>
+    }
+    else
+    {
+        <h2 id="@_id">@Title</h2>
+    }
+    @if (Text is not null)
+    {
+        <p>@Text</p>
+    }
+    @if (Actions is not null)
+    {
+        <div class="empty-state__actions">@Actions</div>
+    }
+</section>
+
+@code {
+    private readonly string _id = $"empty-{Guid.NewGuid():N}"[..14];
+
+    [Parameter] public string Icon { get; set; } = "sprout";
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public int HeadingLevel { get; set; } = 2;
+    [Parameter] public string? Class { get; set; }
+}

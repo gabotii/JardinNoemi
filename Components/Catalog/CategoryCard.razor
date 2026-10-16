@@ -1,0 +1,11 @@
+<a class="category-card" href="/tienda/@Category.Slug">
+    <span class="category-card__media">
+        <img src="@(Category.ImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="400" height="500" loading="lazy" decoding="async" />
+    </span>
+    <span class="category-card__name">@Category.Name</span>
+    <span class="category-card__count">@Category.ProductCount.Pluralize("producto", "productos")</span>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public CategoryDto Category { get; set; } = default!;
+}

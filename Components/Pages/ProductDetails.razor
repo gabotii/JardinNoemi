@@ -1,0 +1,282 @@
+@page "/producto/{Slug}"
+@using System.Text.Json
+@inject ICatalogService Catalog
+@inject CartState CartState
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+@inject IOptions<ShopOptions> Store
+@inject IOptionsMonitor<ShippingOptions> Shipping
+
+@if (State is { } state)
+{
+    var p = state.Product;
+    <SeoHead Title="@p.Name" Description="@($"{p.ShortDescription} {p.Price.ToMoney()} en JardinNoemi. Despacho a todo Chile.")"
+             Canonical="@($"/producto/{p.Slug}")" Image="@p.Images.FirstOrDefault()?.Url" OgType="product" JsonLd="@ProductJsonLd(p)" />
+
+    <div class="container @(p.InStock ? "has-buy-bar" : null)" style="padding-top:var(--space-6)">
+        <Breadcrumbs Items="@([new("Tienda", "/tienda"), new(p.CategoryName, $"/tienda/{p.CategorySlug}"), new(p.Name)])" />
+
+        <div class="pdp">
+            <ProductGallery @ref="_gallery" Images="p.Images" ProductName="@p.Name">
+                <Badges>
+                    @if (!p.InStock)
+                    {
+                        <span class="badge badge--soldout">Agotado</span>
+                    }
+                    else if (p.IsOnSale)
+                    {
+                        <span class="badge badge--sale">-@p.DiscountPercent%</span>
+                    }
+                    @if (p.IsPetFriendly == true)
+                    {
+                        <span class="badge badge--pet"><Icon Name="paw" Class="icon--sm" /> Apta mascotas</span>
+                    }
+                </Badges>
+            </ProductGallery>
+
+            <div class="pdp__info">
+                <div>
+                    <a class="pdp__category" href="/tienda/@p.CategorySlug">@p.CategoryName</a>
+                    <h1 class="pdp__title" tabindex="-1">@p.Name</h1>
+                </div>
+                <StarRating Value="p.Rating" Count="p.ReviewCount" />
+                <p class="pdp__summary">@p.ShortDescription</p>
+
+                <div class="pdp__price-row">
+                    <PriceTag Price="p.Price" CompareAt="p.CompareAtPrice" Large="true" />
+                    @if (p.IsOnSale)
+                    {
+                        <span class="pdp__saving">Ahorras @((p.CompareAtPrice!.Value - p.Price).ToMoney())</span>
+                    }
+                </div>
+
+                <div class="pdp__buy">
+                    @if (p.InStock)
+                    {
+                        <span class="stock @(p.IsLowStock ? "stock--low" : "stock--in")">
+                            @(p.IsLowStock ? $"¡Quedan solo {p.Stock}!" : "Disponible para despacho inmediato")
+                        </span>
+                        <div class="pdp__buy-row">
+                            <QuantitySelector @bind-Value="_quantity" Max="MaxQuantity(p)" ItemName="@p.Name" />
+                            <AppButton Size="lg" IconStart="bag" Loading="_adding" LoadingText="Agregando…" OnClick="() => AddAsync(p)">Agregar al carrito</AppButton>
+                        </div>
+                        <AppButton Size="lg" Variant="accent" Block="true" Loading="_buying" LoadingText="Preparando…" OnClick="() => BuyNowAsync(p)">Comprar ahora</AppButton>
+                    }
+                    else
+                    {
+                        <span class="stock stock--out">Agotado por ahora</span>
+                        <p class="small muted" style="margin:0">
+                            Estamos cultivando más. Escríbenos y te avisaremos apenas vuelva a estar disponible.
+                        </p>
+                        <div class="pdp__buy-row">
+                            <AppButton Variant="outline" Href="@($"https://wa.me/{Store.Value.WhatsApp}?text={Uri.EscapeDataString($"Hola, me avisan cuando vuelva {p.Name}?")}")"
+                                       IconStart="message" target="_blank" rel="noopener noreferrer">Avísame por WhatsApp</AppButton>
+                            <AppButton Variant="ghost" Href="@($"/tienda/{p.CategorySlug}")" IconEnd="arrow-right">Ver similares</AppButton>
+                        </div>
+                    }
+                </div>
+
+                <ul class="pdp__perks">
+                    <li><Icon Name="truck" /> Gratis sobre @Shipping.CurrentValue.FreeShippingThreshold.ToMoney()</li>
+                    <li><Icon Name="shield" /> Garantía de llegada 7 días</li>
+                    <li><Icon Name="store" /> Retiro gratis en el taller</li>
+                    <li><Icon Name="lock" /> Pago seguro</li>
+                </ul>
+
+                @if (p.HasCareInfo || p.Size is not null)
+                {
+                    <dl class="care-grid" aria-label="Ficha de cuidados">
+                        @if (p.Light is not null)
+                        {
+                            <div class="care-item"><Icon Name="sun" /><div><dt>Luz</dt><dd>@p.Light</dd></div></div>
+                        }
+                        @if (p.Watering is not null)
+                        {
+                            <div class="care-item"><Icon Name="droplet" /><div><dt>Riego</dt><dd>@p.Watering</dd></div></div>
+                        }
+                        @if (p.Size is not null)
+                        {
+                            <div class="care-item"><Icon Name="ruler" /><div><dt>Tamaño</dt><dd>@p.Size</dd></div></div>
+                        }
+                        @if (p.CareLevel is not null)
+                        {
+                            <div class="care-item"><Icon Name="sparkles" /><div><dt>Cuidado</dt><dd>@OrderText.Care(p.CareLevel)</dd></div></div>
+                        }
+                        @if (p.IsPetFriendly is not null)
+                        {
+                            <div class="care-item"><Icon Name="paw" /><div><dt>Mascotas</dt><dd>@(p.IsPetFriendly == true ? "Segura para mascotas" : "Mantener fuera de su alcance")</dd></div></div>
+                        }
+                    </dl>
+                }
+
+                <div class="pdp__details">
+                    <details open>
+                        <summary>Descripción <Icon Name="chevron-down" /></summary>
+                        <div class="details-body">
+                            @foreach (var paragraph in p.Description.Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                <p>@paragraph</p>
+                            }
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Envío y retiro <Icon Name="chevron-down" /></summary>
+                        <div class="details-body">
+                            <p>Despachamos de lunes a viernes a todo Chile en @Shipping.CurrentValue.EstimatedDaysMin a @Shipping.CurrentValue.EstimatedDaysMax días hábiles, con embalaje especial para plantas. También puedes retirar gratis en nuestro taller.</p>
+                            <p><a href="/politicas/envios">Ver política de envíos</a></p>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Cambios y garantía <Icon Name="chevron-down" /></summary>
+                        <div class="details-body">
+                            <p>Si tu planta llega dañada, envíanos una foto dentro de 7 días y la reponemos sin costo. Los accesorios tienen 30 días para cambios.</p>
+                            <p><a href="/politicas/devoluciones">Ver política de cambios</a></p>
+                        </div>
+                    </details>
+                    <p class="small muted" style="margin:var(--space-4) 0 0">SKU: @p.Sku</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (state.Related.Count > 0)
+    {
+        <section class="section section--sage" aria-labelledby="related-title">
+            <div class="container">
+                <div class="section__header">
+                    <div>
+                        <p class="eyebrow">Combina bien con</p>
+                        <h2 id="related-title">También te puede gustar</h2>
+                    </div>
+                    <AppButton Href="@($"/tienda/{p.CategorySlug}")" Variant="ghost" IconEnd="arrow-right">Ver @p.CategoryName.ToLowerInvariant()</AppButton>
+                </div>
+                <ProductGrid Products="state.Related" FourColumns="true" Label="Productos relacionados" />
+            </div>
+        </section>
+    }
+
+    @if (p.InStock)
+    {
+        <div class="mobile-buy-bar">
+            <div class="price">
+                <span class="mobile-buy-bar__name">@p.Name</span>
+                <PriceTag Price="p.Price" CompareAt="p.CompareAtPrice" />
+            </div>
+            <AppButton IconStart="bag" Loading="_adding" LoadingText="Agregando" OnClick="() => AddAsync(p)">Agregar</AppButton>
+        </div>
+    }
+}
+else
+{
+    <div class="container" style="padding-block:var(--space-10)">
+        <div class="pdp">
+            <span class="skeleton" style="aspect-ratio:1/1;border-radius:var(--radius-xl)"></span>
+            <div>
+                <span class="skeleton skeleton--text" style="width:30%"></span>
+                <span class="skeleton skeleton--title" style="height:2.4rem;margin:1rem 0"></span>
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text" style="width:80%"></span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ProductGallery? _gallery;
+    private int _quantity = 1;
+    private bool _adding;
+    private bool _buying;
+
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    [PersistentState]
+    public ProductState? State { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // El componente se reutiliza al navegar entre productos: solo se recarga si cambió el slug.
+        if (State?.Product.Slug.Equals(Slug, StringComparison.OrdinalIgnoreCase) == true) return;
+
+        State = null;
+        _quantity = 1;
+        _gallery?.Reset();
+
+        var product = await Catalog.GetBySlugAsync(Slug.ToLowerInvariant());
+        if (product is null)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        var related = await Catalog.GetRelatedAsync(product.Id, product.CategoryId, 4);
+        State = new ProductState(product, related);
+    }
+
+    private static int MaxQuantity(ProductDetailDto p) => Math.Max(1, Math.Min(CartService.MaxQuantityPerLine, p.Stock));
+
+    private async Task<bool> AddCoreAsync(ProductDetailDto p, bool openDrawer)
+    {
+        var result = await CartState.AddAsync(p.Id, _quantity, openDrawer);
+        if (!result.Success)
+        {
+            Toasts.Error("No pudimos agregarlo", result.Message);
+            return false;
+        }
+        if (result.Message is not null) Toasts.Warning("Stock limitado", result.Message);
+        return true;
+    }
+
+    private async Task AddAsync(ProductDetailDto p)
+    {
+        _adding = true;
+        try { await AddCoreAsync(p, openDrawer: true); }
+        finally { _adding = false; }
+    }
+
+    private async Task BuyNowAsync(ProductDetailDto p)
+    {
+        _buying = true;
+        try
+        {
+            if (await AddCoreAsync(p, openDrawer: false)) Navigation.NavigateTo("/checkout");
+        }
+        finally { _buying = false; }
+    }
+
+    private string ProductJsonLd(ProductDetailDto p)
+    {
+        var baseUrl = Store.Value.BaseUrl.TrimEnd('/');
+        var data = new Dictionary<string, object?>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "Product",
+            ["name"] = p.Name,
+            ["description"] = p.ShortDescription,
+            ["sku"] = p.Sku,
+            ["image"] = p.Images.Select(i => i.Url.StartsWith("http") ? i.Url : baseUrl + i.Url).ToArray(),
+            ["brand"] = new Dictionary<string, string> { ["@type"] = "Brand", ["name"] = Store.Value.Name },
+            ["category"] = p.CategoryName,
+            ["offers"] = new Dictionary<string, object>
+            {
+                ["@type"] = "Offer",
+                ["url"] = $"{baseUrl}/producto/{p.Slug}",
+                ["priceCurrency"] = Store.Value.CurrencyCode,
+                ["price"] = p.Price.ToInvariantAmount(),
+                ["availability"] = p.InStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                ["itemCondition"] = "https://schema.org/NewCondition"
+            }
+        };
+        if (p.ReviewCount > 0)
+        {
+            data["aggregateRating"] = new Dictionary<string, object>
+            {
+                ["@type"] = "AggregateRating",
+                ["ratingValue"] = p.Rating.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+                ["reviewCount"] = p.ReviewCount
+            };
+        }
+        return JsonSerializer.Serialize(data);
+    }
+
+    public sealed record ProductState(ProductDetailDto Product, IReadOnlyList<ProductCardDto> Related);
+}

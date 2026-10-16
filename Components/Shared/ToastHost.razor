@@ -1,0 +1,45 @@
+@inject ToastService Toasts
+@implements IDisposable
+
+<div class="toast-region" role="region" aria-label="Notificaciones">
+    <div aria-live="polite" aria-atomic="false" style="display:contents">
+        @foreach (var toast in Toasts.Toasts)
+        {
+            <div class="toast toast--@toast.Kind.ToString().ToLowerInvariant()" role="@(toast.Kind == ToastKind.Error ? "alert" : "status")" @key="toast.Id">
+                <span class="toast__icon" aria-hidden="true">
+                    <Icon Name="@IconFor(toast.Kind)" Class="icon--sm" />
+                </span>
+                <div>
+                    <p class="toast__title">@toast.Title</p>
+                    @if (toast.Message is not null)
+                    {
+                        <p class="toast__msg">@toast.Message</p>
+                    }
+                    @if (toast.ActionText is not null && toast.ActionHref is not null)
+                    {
+                        <a class="toast__action" href="@toast.ActionHref" @onclick="() => Toasts.Dismiss(toast.Id)">@toast.ActionText →</a>
+                    }
+                </div>
+                <button type="button" class="toast__close" aria-label="Cerrar notificación" @onclick="() => Toasts.Dismiss(toast.Id)">
+                    <Icon Name="x" Class="icon--sm" />
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized() => Toasts.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private static string IconFor(ToastKind kind) => kind switch
+    {
+        ToastKind.Success => "check",
+        ToastKind.Error => "alert",
+        ToastKind.Warning => "alert",
+        _ => "info"
+    };
+
+    public void Dispose() => Toasts.Changed -= OnChanged;
+}

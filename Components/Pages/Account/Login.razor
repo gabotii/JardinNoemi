@@ -1,0 +1,98 @@
+@page "/cuenta/ingresar"
+@attribute [ExcludeFromInteractiveRouting]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+
+@* Renderizado estático (SSR): el inicio de sesión necesita HttpContext para emitir la cookie. *@
+<SeoHead Title="Ingresar" Description="Ingresa a tu cuenta de JardinNoemi." NoIndex="true" />
+
+<div class="auth-layout">
+    <div class="auth-layout__form">
+        <div class="auth-card">
+            <p class="eyebrow">Mi cuenta</p>
+            <h1 tabindex="-1">Hola de nuevo</h1>
+            <p class="lead">Ingresa para ver tus pedidos y comprar más rápido.</p>
+
+            @if (_error is not null)
+            {
+                <div class="notice notice--danger" role="alert" style="margin-bottom:var(--space-5)">
+                    <Icon Name="alert" /><span>@_error</span>
+                </div>
+            }
+
+            <EditForm Model="Input" method="post" OnValidSubmit="LoginAsync" FormName="login">
+                <DataAnnotationsValidator />
+                <div class="field">
+                    <label class="field__label" for="login-email">Correo electrónico</label>
+                    <InputText id="login-email" type="email" @bind-Value="Input.Email" autocomplete="username" aria-required="true" />
+                    <ValidationMessage For="() => Input.Email" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="login-password">Contraseña</label>
+                    <InputText id="login-password" type="password" @bind-Value="Input.Password" autocomplete="current-password" aria-required="true" />
+                    <ValidationMessage For="() => Input.Password" />
+                </div>
+                <label class="checkbox">
+                    <InputCheckbox @bind-Value="Input.RememberMe" /> Mantener mi sesión iniciada
+                </label>
+                <AppButton Type="submit" Size="lg" Block="true" IconEnd="arrow-right">Ingresar</AppButton>
+            </EditForm>
+
+            <div class="auth-card__footer">
+                ¿Aún no tienes cuenta? <a href="@RegisterUrl">Crea una en segundos</a>
+            </div>
+        </div>
+    </div>
+    <div class="auth-layout__art" aria-hidden="true">
+        <img src="/images/brand/hero.svg" alt="" width="1000" height="1000" />
+        <p class="auth-layout__quote">“Una planta bien cuidada cambia el ánimo de una casa.”<span>— Noemí, fundadora</span></p>
+    </div>
+</div>
+
+@code {
+    private string? _error;
+
+    [SupplyParameterFromForm]
+    private LoginInput Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string RegisterUrl => string.IsNullOrEmpty(ReturnUrl)
+        ? "/cuenta/registro"
+        : $"/cuenta/registro?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task LoginAsync()
+    {
+        // El bloqueo tras 5 intentos fallidos protege contra fuerza bruta.
+        var result = await SignInManager.PasswordSignInAsync(Input.Email.Trim(), Input.Password, Input.RememberMe, lockoutOnFailure: true);
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("Inicio de sesión correcto.");
+            Navigation.NavigateTo(AccountEndpoints.SafeLocalUrl(ReturnUrl), forceLoad: true);
+            return;
+        }
+
+        _error = result.IsLockedOut
+            ? "Tu cuenta quedó bloqueada temporalmente por varios intentos fallidos. Inténtalo en 10 minutos."
+            : "Correo o contraseña incorrectos.";
+    }
+
+    private sealed class LoginInput
+    {
+        [Required(ErrorMessage = "Ingresa tu correo.")]
+        [EmailAddress(ErrorMessage = "El correo no tiene un formato válido.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Ingresa tu contraseña.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}

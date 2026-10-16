@@ -1,0 +1,397 @@
+@page "/checkout"
+@using System.Security.Claims
+@using JardinNoemi.Services.Payments
+@inject CartState CartState
+@inject IOrderService Orders
+@inject ICustomerService Customers
+@inject IShippingCalculator Shipping
+@inject IPaymentGateway PaymentGateway
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+@inject IOptions<ShopOptions> Store
+@inject IJSRuntime JS
+@implements IDisposable
+
+<SeoHead Title="Finalizar compra" Description="Completa tu pedido en JardinNoemi de forma segura." NoIndex="true" />
+
+<div class="container" style="padding-top:var(--space-8)">
+    <ol class="checkout-steps" aria-label="Progreso de compra">
+        <li class="is-done"><Icon Name="check" Class="icon--sm" /> Carrito</li>
+        <li class="is-current" aria-current="step">Datos y pago</li>
+        <li>Confirmación</li>
+    </ol>
+    <h1 tabindex="-1" style="margin-bottom:var(--space-2)">Finalizar compra</h1>
+    @if (_userId is null && CartState.IsInitialized && !CartState.Cart.IsEmpty)
+    {
+        <p class="muted" style="margin:0">
+            ¿Ya tienes cuenta? <a href="/cuenta/ingresar?returnUrl=%2Fcheckout">Ingresa</a> para completar tus datos más rápido. También puedes comprar como invitado.
+        </p>
+    }
+</div>
+
+<div class="container">
+    @if (!CartState.IsInitialized)
+    {
+        <LoadingSpinner Center="true" Label="Preparando tu pedido…" />
+    }
+    else if (CartState.Cart.IsEmpty)
+    {
+        <EmptyState Icon="bag" Title="No hay nada que pagar todavía" Text="Tu carrito está vacío. Agrega algunas plantas y vuelve aquí.">
+            <Actions>
+                <AppButton Href="/tienda" IconEnd="arrow-right">Ir a la tienda</AppButton>
+            </Actions>
+        </EmptyState>
+    }
+    else
+    {
+        var cart = CartState.Cart;
+        var home = Shipping.Quote(cart.Subtotal, DeliveryMethod.HomeDelivery, _form.Region);
+        <EditForm EditContext="_editContext" OnValidSubmit="SubmitAsync" OnInvalidSubmit="OnInvalidSubmitAsync" class="checkout-layout checkout-form">
+            <DataAnnotationsValidator />
+            <div>
+                @if (_error is not null)
+                {
+                    <div class="notice notice--danger" role="alert" style="margin-bottom:var(--space-5)" tabindex="-1" @ref="_errorRef">
+                        <Icon Name="alert" />
+                        <div><strong>No pudimos completar tu pedido</strong>@_error</div>
+                    </div>
+                }
+
+                <section class="checkout-section" aria-labelledby="step-contact">
+                    <h2 class="checkout-section__title" id="step-contact"><span class="step-number">1</span> Tus datos</h2>
+                    <div class="form-grid">
+                        <div class="field span-3">
+                            <label class="field__label" for="first-name">Nombre</label>
+                            <InputText id="first-name" @bind-Value="_form.FirstName" autocomplete="given-name" aria-required="true" />
+                            <ValidationMessage For="() => _form.FirstName" />
+                        </div>
+                        <div class="field span-3">
+                            <label class="field__label" for="last-name">Apellido</label>
+                            <InputText id="last-name" @bind-Value="_form.LastName" autocomplete="family-name" aria-required="true" />
+                            <ValidationMessage For="() => _form.LastName" />
+                        </div>
+                        <div class="field span-3">
+                            <label class="field__label" for="email">Correo electrónico</label>
+                            <InputText id="email" type="email" @bind-Value="_form.Email" autocomplete="email" aria-required="true" aria-describedby="email-hint" />
+                            <span class="field__hint" id="email-hint">Lo usaremos para contactarte sobre tu pedido.</span>
+                            <ValidationMessage For="() => _form.Email" />
+                        </div>
+                        <div class="field span-3">
+                            <label class="field__label" for="phone">Teléfono</label>
+                            <InputText id="phone" type="tel" @bind-Value="_form.Phone" autocomplete="tel" placeholder="+56 9 1234 5678" aria-required="true" />
+                            <ValidationMessage For="() => _form.Phone" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="checkout-section" aria-labelledby="step-delivery">
+                    <h2 class="checkout-section__title" id="step-delivery"><span class="step-number">2</span> Entrega</h2>
+                    <InputRadioGroup @bind-Value="_form.DeliveryMethod">
+                        <div class="option-cards" role="radiogroup" aria-labelledby="step-delivery">
+                            <label class="option-card">
+                                <InputRadio Value="DeliveryMethod.HomeDelivery" />
+                                <span class="option-card__icon"><Icon Name="truck" /></span>
+                                <span>
+                                    <span class="option-card__title">Despacho a domicilio</span>
+                                    <span class="option-card__desc">@home.DaysMin a @home.DaysMax días hábiles</span>
+                                </span>
+                                <span class="option-card__price">@(home.IsFree ? "Gratis" : string.IsNullOrEmpty(_form.Region) ? "Según región" : home.Cost.ToMoney())</span>
+                            </label>
+                            <label class="option-card">
+                                <InputRadio Value="DeliveryMethod.StorePickup" />
+                                <span class="option-card__icon"><Icon Name="store" /></span>
+                                <span>
+                                    <span class="option-card__title">Retiro en el taller</span>
+                                    <span class="option-card__desc">Gratis · listo en 24 h hábiles</span>
+                                </span>
+                                <span class="option-card__price">Gratis</span>
+                            </label>
+                        </div>
+                    </InputRadioGroup>
+
+                    @if (_form.DeliveryMethod == DeliveryMethod.HomeDelivery)
+                    {
+                        <div class="form-grid" style="margin-top:var(--space-6)">
+                            <div class="field span-4">
+                                <label class="field__label" for="street">Dirección</label>
+                                <InputText id="street" @bind-Value="_form.Street" autocomplete="address-line1" placeholder="Calle y número" aria-required="true" />
+                                <ValidationMessage For="() => _form.Street" />
+                            </div>
+                            <div class="field span-2">
+                                <label class="field__label" for="apartment">Depto / Casa <span class="optional">(opcional)</span></label>
+                                <InputText id="apartment" @bind-Value="_form.Apartment" autocomplete="address-line2" />
+                            </div>
+                            <div class="field span-2">
+                                <label class="field__label" for="city">Comuna</label>
+                                <InputText id="city" @bind-Value="_form.City" autocomplete="address-level2" aria-required="true" />
+                                <ValidationMessage For="() => _form.City" />
+                            </div>
+                            <div class="field span-2">
+                                <label class="field__label" for="region">Región</label>
+                                <InputSelect id="region" @bind-Value="_form.Region" autocomplete="address-level1" aria-required="true">
+                                    <option value="">Selecciona…</option>
+                                    @foreach (var region in Regions.All)
+                                    {
+                                        <option value="@region">@region</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => _form.Region" />
+                            </div>
+                            <div class="field span-2">
+                                <label class="field__label" for="postal">Código postal <span class="optional">(opcional)</span></label>
+                                <InputText id="postal" @bind-Value="_form.PostalCode" autocomplete="postal-code" inputmode="numeric" />
+                                <ValidationMessage For="() => _form.PostalCode" />
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="notice notice--info" style="margin-top:var(--space-5)">
+                            <Icon Name="map-pin" />
+                            <div><strong>Retiro en nuestro taller</strong>@Store.Value.Address · @Store.Value.OpeningHours. Te avisaremos por correo cuando tu pedido esté listo.</div>
+                        </div>
+                    }
+
+                    <div class="field" style="margin-top:var(--space-5)">
+                        <label class="field__label" for="notes">Notas del pedido <span class="optional">(opcional)</span></label>
+                        <InputTextArea id="notes" @bind-Value="_form.Notes" rows="3" placeholder="Indicaciones para el despacho o el mensaje para tu tarjeta de regalo." />
+                        <ValidationMessage For="() => _form.Notes" />
+                    </div>
+                </section>
+
+                <section class="checkout-section" aria-labelledby="step-payment">
+                    <h2 class="checkout-section__title" id="step-payment"><span class="step-number">3</span> Pago</h2>
+
+                    <InputRadioGroup @bind-Value="_form.PaymentMethod">
+                        <div class="option-cards" role="radiogroup" aria-labelledby="step-payment">
+                            <label class="option-card">
+                                <InputRadio Value="PaymentMethod.Card" />
+                                <span class="option-card__icon"><Icon Name="card" /></span>
+                                <span>
+                                    <span class="option-card__title">Tarjeta de crédito o débito</span>
+                                    <span class="option-card__desc">Aprobación inmediata</span>
+                                </span>
+                            </label>
+                            <label class="option-card">
+                                <InputRadio Value="PaymentMethod.BankTransfer" />
+                                <span class="option-card__icon"><Icon Name="bank" /></span>
+                                <span>
+                                    <span class="option-card__title">Transferencia bancaria</span>
+                                    <span class="option-card__desc">Reservamos tu pedido por @Store.Value.BankTransfer.HoldHours h</span>
+                                </span>
+                            </label>
+                        </div>
+                    </InputRadioGroup>
+
+                    @if (_form.PaymentMethod == PaymentMethod.Card)
+                    {
+                        @if (PaymentGateway.IsTestMode)
+                        {
+                            <div class="notice notice--test" role="note" style="margin-top:var(--space-5)">
+                                <Icon Name="info" />
+                                <div>
+                                    <strong>Modo de prueba: no se realizará ningún cargo.</strong>
+                                    Esta tienda aún no está conectada a una pasarela de pago real. Tus datos de tarjeta no se guardan.
+                                </div>
+                            </div>
+                        }
+                        <div class="card-fields">
+                            <div class="form-grid">
+                                <div class="field">
+                                    <label class="field__label" for="cc-name">Nombre en la tarjeta</label>
+                                    <InputText id="cc-name" @bind-Value="_form.CardName" autocomplete="cc-name" />
+                                    <ValidationMessage For="() => _form.CardName" />
+                                </div>
+                                <div class="field">
+                                    <label class="field__label" for="cc-number">Número de tarjeta</label>
+                                    <InputText id="cc-number" @bind-Value="_form.CardNumber" autocomplete="cc-number" inputmode="numeric" placeholder="1234 5678 9012 3456" maxlength="23" />
+                                    <ValidationMessage For="() => _form.CardNumber" />
+                                </div>
+                                <div class="field span-3">
+                                    <label class="field__label" for="cc-exp">Vencimiento</label>
+                                    <InputText id="cc-exp" @bind-Value="_form.CardExpiry" autocomplete="cc-exp" placeholder="MM/AA" maxlength="5" />
+                                    <ValidationMessage For="() => _form.CardExpiry" />
+                                </div>
+                                <div class="field span-3">
+                                    <label class="field__label" for="cc-cvc">CVC</label>
+                                    <InputText id="cc-cvc" @bind-Value="_form.CardCvc" autocomplete="cc-csc" inputmode="numeric" placeholder="123" maxlength="4" />
+                                    <ValidationMessage For="() => _form.CardCvc" />
+                                </div>
+                            </div>
+                            @if (PaymentGateway.IsTestMode)
+                            {
+                                <p class="test-cards">
+                                    Tarjetas de prueba: <code>4242 4242 4242 4242</code> aprobada · <code>4000 0000 0000 0002</code> rechazada · cualquier fecha futura y CVC.
+                                </p>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="notice notice--info" style="margin-top:var(--space-5)">
+                            <Icon Name="bank" />
+                            <div>
+                                <strong>Te mostraremos los datos bancarios al confirmar.</strong>
+                                Preparamos tu pedido apenas recibamos el comprobante en @Store.Value.BankTransfer.Email.
+                            </div>
+                        </div>
+                    }
+                </section>
+            </div>
+
+            <aside class="checkout-summary" aria-label="Resumen del pedido">
+                <CheckoutOrderSummary Lines="cart.Lines" Subtotal="cart.Subtotal" Quote="SummaryQuote">
+                    <div style="display:grid;gap:var(--space-4);margin-top:var(--space-6)">
+                        <label class="checkbox">
+                            <InputCheckbox @bind-Value="_form.AcceptTerms" />
+                            <span>Acepto los <a href="/politicas/terminos" target="_blank">términos y condiciones</a> y la <a href="/politicas/privacidad" target="_blank">política de privacidad</a>.</span>
+                        </label>
+                        <ValidationMessage For="() => _form.AcceptTerms" />
+                        <AppButton Type="submit" Size="lg" Block="true" Loading="_submitting" LoadingText="Procesando pago…" IconStart="lock" Disabled="!cart.CanCheckout">
+                            @SubmitLabel(cart.Subtotal)
+                        </AppButton>
+                        @if (!cart.CanCheckout)
+                        {
+                            <p class="validation-message">Revisa tu carrito: hay productos sin stock suficiente.</p>
+                        }
+                        <a class="continue-link" href="/carrito" style="margin:0;justify-self:center"><Icon Name="arrow-left" Class="icon--sm" /> Volver al carrito</a>
+                    </div>
+                </CheckoutOrderSummary>
+                <ul class="trust-list" style="padding-inline:var(--space-2)">
+                    <li><Icon Name="lock" /> Conexión cifrada. No guardamos datos de tarjetas.</li>
+                    <li><Icon Name="shield" /> Garantía de llegada de 7 días.</li>
+                </ul>
+            </aside>
+        </EditForm>
+    }
+</div>
+
+@if (_submitting)
+{
+    <div class="processing-overlay" role="alertdialog" aria-modal="true" aria-labelledby="processing-title">
+        <div class="processing-overlay__box">
+            <span class="spinner__ring" style="width:48px;height:48px" aria-hidden="true"></span>
+            <h2 id="processing-title" style="margin:0;font-size:var(--fs-xl)">Procesando tu pedido</h2>
+            <p>No cierres ni recargues esta página. Solo tomará unos segundos.</p>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly CheckoutForm _form = new();
+    private EditContext _editContext = default!;
+    private ElementReference _errorRef;
+    private string? _userId;
+    private string? _error;
+    private bool _submitting;
+    private bool _focusError;
+
+    private ShippingQuote CurrentQuote => Shipping.Quote(CartState.Cart.Subtotal, _form.DeliveryMethod, _form.Region);
+
+    /// <summary>Sin región elegida no se conoce el costo de despacho (salvo que ya sea gratis).</summary>
+    private ShippingQuote? SummaryQuote =>
+        _form.DeliveryMethod == DeliveryMethod.HomeDelivery && string.IsNullOrEmpty(_form.Region) && !CurrentQuote.IsFree
+            ? null
+            : CurrentQuote;
+
+    private string SubmitLabel(decimal subtotal) => (_form.PaymentMethod, SummaryQuote) switch
+    {
+        (PaymentMethod.BankTransfer, _) => "Confirmar pedido",
+        (_, { } quote) => $"Pagar {(subtotal + quote.Cost).ToMoney()}",
+        _ => "Pagar pedido"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _editContext = new EditContext(_form);
+        CartState.Changed += OnCartChanged;
+
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated == true)
+        {
+            _userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (_userId is not null && await Customers.GetProfileAsync(_userId) is { } profile)
+            {
+                _form.FirstName = profile.FirstName;
+                _form.LastName = profile.LastName;
+                _form.Email = profile.Email;
+                _form.Phone = profile.Phone ?? string.Empty;
+                _form.Street = profile.Street;
+                _form.Apartment = profile.Apartment;
+                _form.City = profile.City;
+                _form.Region = profile.Region;
+                _form.PostalCode = profile.PostalCode;
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await CartState.EnsureInitializedAsync();
+
+        if (_focusError)
+        {
+            _focusError = false;
+            try
+            {
+                if (_error is not null) await _errorRef.FocusAsync();
+                else await JS.InvokeVoidAsync("jn.focus", ".checkout-form .invalid");
+            }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    private void OnInvalidSubmitAsync()
+    {
+        _focusError = true;
+        Toasts.Warning("Revisa el formulario", "Hay campos por completar o corregir.");
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_submitting || CartState.CartId is not { } cartId) return;
+
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var result = await Orders.PlaceOrderAsync(cartId, _form, _userId);
+            if (result.Success)
+            {
+                ClearSensitiveFields();
+                CartState.MarkAsEmptied();
+                Navigation.NavigateTo($"/pedido/{result.OrderNumber}?token={result.AccessToken}");
+                return;
+            }
+
+            _error = " " + result.ErrorMessage;
+            _focusError = true;
+            if (result.CartChanged) await CartState.RefreshAsync();
+        }
+        catch (Exception)
+        {
+            _error = " Ocurrió un problema inesperado. No se realizó ningún cobro; inténtalo nuevamente en unos minutos.";
+            _focusError = true;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private void ClearSensitiveFields()
+    {
+        _form.CardNumber = null;
+        _form.CardCvc = null;
+        _form.CardExpiry = null;
+    }
+
+    private void OnCartChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        CartState.Changed -= OnCartChanged;
+        ClearSensitiveFields();
+    }
+}

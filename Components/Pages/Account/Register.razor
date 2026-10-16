@@ -1,0 +1,150 @@
+@page "/cuenta/registro"
+@attribute [ExcludeFromInteractiveRouting]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject ICustomerService Customers
+@inject NavigationManager Navigation
+@inject ILogger<Register> Logger
+
+<SeoHead Title="Crear cuenta" Description="Crea tu cuenta en JardinNoemi para seguir tus pedidos y comprar más rápido." NoIndex="true" />
+
+<div class="auth-layout">
+    <div class="auth-layout__form">
+        <div class="auth-card">
+            <p class="eyebrow">Únete al jardín</p>
+            <h1 tabindex="-1">Crea tu cuenta</h1>
+            <p class="lead">Guarda tus datos de despacho, revisa tus pedidos y recibe consejos para tus plantas.</p>
+
+            @if (_errors.Count > 0)
+            {
+                <div class="notice notice--danger" role="alert" style="margin-bottom:var(--space-5)">
+                    <Icon Name="alert" />
+                    <div>
+                        @foreach (var error in _errors)
+                        {
+                            <span style="display:block">@error</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <EditForm Model="Input" method="post" OnValidSubmit="RegisterAsync" FormName="register">
+                <DataAnnotationsValidator />
+                <div class="form-grid">
+                    <div class="field span-3">
+                        <label class="field__label" for="reg-first">Nombre</label>
+                        <InputText id="reg-first" @bind-Value="Input.FirstName" autocomplete="given-name" aria-required="true" />
+                        <ValidationMessage For="() => Input.FirstName" />
+                    </div>
+                    <div class="field span-3">
+                        <label class="field__label" for="reg-last">Apellido</label>
+                        <InputText id="reg-last" @bind-Value="Input.LastName" autocomplete="family-name" aria-required="true" />
+                        <ValidationMessage For="() => Input.LastName" />
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="reg-email">Correo electrónico</label>
+                        <InputText id="reg-email" type="email" @bind-Value="Input.Email" autocomplete="email" aria-required="true" />
+                        <ValidationMessage For="() => Input.Email" />
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="reg-password">Contraseña</label>
+                        <InputText id="reg-password" type="password" @bind-Value="Input.Password" autocomplete="new-password" aria-required="true" aria-describedby="reg-password-hint" />
+                        <span class="field__hint" id="reg-password-hint">Mínimo 8 caracteres, con una mayúscula, una minúscula y un número.</span>
+                        <ValidationMessage For="() => Input.Password" />
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="reg-confirm">Repite la contraseña</label>
+                        <InputText id="reg-confirm" type="password" @bind-Value="Input.ConfirmPassword" autocomplete="new-password" aria-required="true" />
+                        <ValidationMessage For="() => Input.ConfirmPassword" />
+                    </div>
+                    <div>
+                        <label class="checkbox">
+                            <InputCheckbox @bind-Value="Input.AcceptTerms" />
+                            <span>Acepto los <a href="/politicas/terminos" target="_blank">términos</a> y la <a href="/politicas/privacidad" target="_blank">política de privacidad</a>.</span>
+                        </label>
+                        <ValidationMessage For="() => Input.AcceptTerms" />
+                    </div>
+                    <AppButton Type="submit" Size="lg" Block="true" IconEnd="arrow-right">Crear cuenta</AppButton>
+                </div>
+            </EditForm>
+
+            <div class="auth-card__footer">
+                ¿Ya tienes cuenta? <a href="@LoginUrl">Ingresa aquí</a>
+            </div>
+        </div>
+    </div>
+    <div class="auth-layout__art" aria-hidden="true">
+        <img src="/images/brand/about-workshop.svg" alt="" width="900" height="700" />
+        <p class="auth-layout__quote">Guarda tus direcciones, sigue tus pedidos y recibe guías de cuidado de temporada.<span>JardinNoemi</span></p>
+    </div>
+</div>
+
+@code {
+    private readonly List<string> _errors = [];
+
+    [SupplyParameterFromForm]
+    private RegisterInput Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string LoginUrl => string.IsNullOrEmpty(ReturnUrl)
+        ? "/cuenta/ingresar"
+        : $"/cuenta/ingresar?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task RegisterAsync()
+    {
+        var email = Input.Email.Trim();
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            FirstName = Input.FirstName.Trim(),
+            LastName = Input.LastName.Trim()
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            _errors.AddRange(result.Errors.Select(e => e.Description).Distinct());
+            return;
+        }
+
+        Logger.LogInformation("Nueva cuenta de cliente creada.");
+        await Customers.EnsureCustomerAsync(user);
+        await SignInManager.SignInAsync(user, isPersistent: false);
+        Navigation.NavigateTo(AccountEndpoints.SafeLocalUrl(ReturnUrl ?? "/cuenta/perfil"), forceLoad: true);
+    }
+
+    private sealed class RegisterInput
+    {
+        [Required(ErrorMessage = "Ingresa tu nombre.")]
+        [StringLength(80)]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Ingresa tu apellido.")]
+        [StringLength(80)]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Ingresa tu correo.")]
+        [EmailAddress(ErrorMessage = "El correo no tiene un formato válido.")]
+        [StringLength(256)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Crea una contraseña.")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "La contraseña debe tener al menos 8 caracteres.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        [Compare(nameof(Password), ErrorMessage = "Las contraseñas no coinciden.")]
+        [DataType(DataType.Password)]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Debes aceptar los términos para continuar.")]
+        public bool AcceptTerms { get; set; }
+    }
+}

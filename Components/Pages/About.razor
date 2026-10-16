@@ -1,0 +1,116 @@
+@page "/nosotros"
+
+<SeoHead Title="Nuestra historia" Description="Conoce a JardinNoemi: un vivero familiar que nació en un balcón de Santiago y hoy lleva plantas sanas y regalos con vida a todo Chile." />
+
+@* Historia y cifras de ejemplo: reemplazar por la historia real del emprendimiento. *@
+<div class="page-hero">
+    <div class="container">
+        <Breadcrumbs Items="@([new("Nosotros")])" />
+        <div class="about-hero" style="padding-block:var(--space-6) 0">
+            <div>
+                <p class="eyebrow">Nuestra historia</p>
+                <h1 tabindex="-1">Todo empezó con <span class="italic-accent">un balcón lleno de esquejes</span></h1>
+                <p class="lead">
+                    JardinNoemi nació de la costumbre de Noemí de rescatar esquejes, propagarlos en frascos y regalarlos a sus amigas.
+                    Hoy es un vivero familiar que cultiva, cuida y lleva plantas con alma a hogares de todo Chile.
+                </p>
+                <div class="hero__actions" style="margin-top:var(--space-6)">
+                    <AppButton Href="/tienda" IconEnd="arrow-right">Conoce nuestras plantas</AppButton>
+                    <AppButton Href="/contacto" Variant="outline">Visita el taller</AppButton>
+                </div>
+            </div>
+            <div class="about-hero__media">
+                <img src="/images/brand/about-workshop.svg" alt="Mesa de trabajo del taller con helecho, terrario, pilea, cactus y regadera" width="900" height="700" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="section" aria-labelledby="story-title">
+    <div class="container story">
+        <blockquote class="story__quote">
+            “Una planta bien cuidada cambia el ánimo de una casa. Queremos que cada persona sienta que puede lograrlo.”
+            <cite>— Noemí, fundadora</cite>
+        </blockquote>
+        <div>
+            <h2 id="story-title" class="visually-hidden">Nuestro camino</h2>
+            <ol class="milestones">
+                <li class="milestone">
+                    <span class="milestone__year">2019</span>
+                    <h3>Un balcón en Ñuñoa</h3>
+                    <p>Noemí propaga potus y suculentas en frascos reciclados. Sus amigas empiezan a pedirle “una igual a la tuya”.</p>
+                </li>
+                <li class="milestone">
+                    <span class="milestone__year">2020</span>
+                    <h3>Las primeras ventas</h3>
+                    <p>En pleno encierro, las plantas se vuelven compañía. Nace la cuenta de Instagram y los primeros despachos en bicicleta.</p>
+                </li>
+                <li class="milestone">
+                    <span class="milestone__year">2022</span>
+                    <h3>El taller y el vivero</h3>
+                    <p>Arrendamos un pequeño taller con invernadero para aclimatar cada planta antes de enviarla. Llegan los terrarios y kokedamas.</p>
+                </li>
+                <li class="milestone">
+                    <span class="milestone__year">Hoy</span>
+                    <h3>Plantas con alma en todo Chile</h3>
+                    <p>Un equipo de cinco personas, alianzas con ceramistas de Pomaire y miles de hogares más verdes, sin perder el trato cercano.</p>
+                </li>
+            </ol>
+        </div>
+    </div>
+</section>
+
+<section class="section section--tight" aria-label="JardinNoemi en cifras">
+    <div class="container">
+        <div class="stats-band">
+            <div><strong>+2.500</strong><span>hogares con plantas nuestras</span></div>
+            <div><strong>+80</strong><span>especies cultivadas</span></div>
+            <div><strong>4,9</strong><span>valoración promedio</span></div>
+            <div><strong>0</strong><span>plástico de un solo uso</span></div>
+        </div>
+    </div>
+</section>
+
+<section class="section" aria-label="Misión y visión">
+    <div class="container mv-grid">
+        <article class="mv-card mv-card--mission">
+            <p class="eyebrow" style="color:var(--sage-300)">Misión</p>
+            <h2>Acercar la naturaleza a cada hogar</h2>
+            <p>Ofrecer plantas sanas y bien cuidadas, junto con el acompañamiento necesario para que cualquier persona pueda disfrutarlas, sin importar su experiencia.</p>
+        </article>
+        <article class="mv-card mv-card--vision">
+            <p class="eyebrow" style="color:var(--clay-600)">Visión</p>
+            <h2>Ser el vivero de confianza de Chile</h2>
+            <p>Convertirnos en la referencia de quienes buscan plantas y regalos con vida, reconocidos por nuestra calidez, calidad y compromiso con el medio ambiente.</p>
+        </article>
+    </div>
+</section>
+
+<section class="section section--muted" aria-labelledby="values-title">
+    <div class="container">
+        <div class="section__header section__header--center">
+            <p class="eyebrow">Lo que nos mueve</p>
+            <h2 id="values-title">Nuestros valores</h2>
+        </div>
+        <ul role="list" class="values-grid">
+            <li class="value-card"><span class="value-card__num">01</span><h3>Cuidado</h3><p>Cada planta se revisa, se limpia y se embala a mano. Si no la llevaríamos a nuestra casa, no sale del vivero.</p></li>
+            <li class="value-card"><span class="value-card__num">02</span><h3>Cercanía</h3><p>Respondemos personas, no tickets. Te acompañamos antes y después de tu compra, por el canal que prefieras.</p></li>
+            <li class="value-card"><span class="value-card__num">03</span><h3>Sostenibilidad</h3><p>Embalaje reutilizable, sustratos sin turba y macetas de artesanos locales. Menos residuos, más raíces.</p></li>
+            <li class="value-card"><span class="value-card__num">04</span><h3>Honestidad</h3><p>Te contamos cuánta luz y agua necesita de verdad cada planta, para que elijas la adecuada para tu espacio.</p></li>
+        </ul>
+    </div>
+</section>
+
+<section class="section" aria-labelledby="philosophy-title">
+    <div class="container container--narrow text-center">
+        <p class="eyebrow">Filosofía de marca</p>
+        <h2 id="philosophy-title">Crecer despacio, cuidar de verdad</h2>
+        <p class="lead" style="margin-inline:auto">
+            Creemos en las plantas que se adaptan a tu vida, no al revés. Por eso preferimos recomendarte una sansevieria que sobrevive a tus viajes
+            antes que venderte algo que no va a prosperar. Crecemos al ritmo de nuestras plantas: despacio, con raíces firmes y mucha luz.
+        </p>
+        <div class="hero__actions" style="justify-content:center;margin-top:var(--space-8)">
+            <AppButton Href="/tienda" Size="lg" IconEnd="arrow-right">Encuentra tu planta</AppButton>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,65 @@
+@* Galería accesible: miniaturas como botones, flechas del teclado y botones anterior/siguiente. *@
+<div class="gallery">
+    <div class="gallery__main" tabindex="0" role="group" aria-roledescription="galería"
+         aria-label="@($"Imagen {_index + 1} de {Images.Count}: {Current.AltText}")" @onkeydown="OnKeyDown">
+        <img src="@Current.Url" alt="@Current.AltText" width="900" height="900" fetchpriority="high" decoding="async" @key="Current.Url" />
+        @if (Badges is not null)
+        {
+            <div class="gallery__badges">@Badges</div>
+        }
+        @if (Images.Count > 1)
+        {
+            <div class="gallery__nav">
+                <button type="button" aria-label="Imagen anterior" @onclick="() => Go(-1)"><Icon Name="chevron-left" /></button>
+                <button type="button" aria-label="Imagen siguiente" @onclick="() => Go(1)"><Icon Name="chevron-right" /></button>
+            </div>
+        }
+    </div>
+    @if (Images.Count > 1)
+    {
+        <ul class="gallery__thumbs" aria-label="Miniaturas">
+            @for (var i = 0; i < Images.Count; i++)
+            {
+                var index = i;
+                <li>
+                    <button type="button" class="gallery__thumb" aria-current="@(index == _index ? "true" : null)"
+                            aria-label="@($"Ver imagen {index + 1}")" @onclick="() => _index = index">
+                        <img src="@Images[index].Url" alt="" width="84" height="84" loading="lazy" decoding="async" />
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private int _index;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ProductImageDto> Images { get; set; } = [];
+    [Parameter] public string ProductName { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Badges { get; set; }
+
+    private ProductImageDto Current => Images.Count == 0
+        ? new ProductImageDto("/images/brand/placeholder.svg", ProductName)
+        : Images[Math.Clamp(_index, 0, Images.Count - 1)];
+
+    protected override void OnParametersSet()
+    {
+        if (_index >= Images.Count) _index = 0;
+    }
+
+    /// <summary>Se llama al cambiar de producto (el componente se reutiliza entre rutas).</summary>
+    public void Reset() => _index = 0;
+
+    private void Go(int delta)
+    {
+        if (Images.Count == 0) return;
+        _index = (_index + delta + Images.Count) % Images.Count;
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowRight") Go(1);
+        else if (e.Key == "ArrowLeft") Go(-1);
+    }
+}

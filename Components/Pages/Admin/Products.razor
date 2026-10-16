@@ -1,0 +1,119 @@
+@page "/admin/productos"
+@inject IAdminCatalogService AdminCatalog
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+
+<AdminPageHeader Title="Productos" Subtitle="Catálogo completo, incluidos los productos ocultos.">
+    <Actions>
+        <AppButton Href="/admin/productos/nuevo" IconStart="plus" Size="sm">Nuevo producto</AppButton>
+    </Actions>
+</AdminPageHeader>
+
+<div class="admin-content">
+    <div class="admin-toolbar">
+        <div class="search" role="search">
+            <Icon Name="search" />
+            <label class="visually-hidden" for="admin-search">Buscar por nombre o SKU</label>
+            <input id="admin-search" type="search" placeholder="Buscar por nombre o SKU" value="@Q" @onchange="SearchAsync" />
+        </div>
+        <div class="segmented" role="group" aria-label="Filtrar productos">
+            @foreach (var (value, label) in FilterOptions)
+            {
+                <a href="@Url(Q, value, 1)" aria-current="@(value == F ? "page" : null)">@label</a>
+            }
+        </div>
+    </div>
+
+    @if (_result is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else if (_result.Items.Count == 0)
+    {
+        <div class="panel"><EmptyState Icon="search" Title="Sin resultados" Text="No hay productos que coincidan con la búsqueda." /></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col"><span class="visually-hidden">Imagen</span></th>
+                        <th scope="col">Producto</th>
+                        <th scope="col">Categoría</th>
+                        <th scope="col" class="num">Precio</th>
+                        <th scope="col" class="num">Stock</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _result.Items)
+                    {
+                        <tr @key="p.Id">
+                            <td><img class="thumb" src="@(p.ImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="44" height="44" loading="lazy" /></td>
+                            <td>
+                                <a href="/admin/productos/@p.Id"><strong>@p.Name</strong></a>
+                                @if (p.IsFeatured) { <span class="badge badge--featured" style="margin-left:6px">Destacado</span> }
+                                <br /><span class="small muted">@p.Sku</span>
+                            </td>
+                            <td>@p.CategoryName</td>
+                            <td class="num">
+                                @p.Price.ToMoney()
+                                @if (p.CompareAtPrice is { } before && before > p.Price)
+                                {
+                                    <br /><s class="small muted">@before.ToMoney()</s>
+                                }
+                            </td>
+                            <td class="num"><span class="@(p.Stock == 0 ? "stock-out" : p.Stock <= AdminCatalogService.LowStockThreshold ? "stock-low" : null)">@p.Stock</span></td>
+                            <td><span class="pill @(p.IsActive ? "pill--success" : "pill--neutral")">@(p.IsActive ? "Visible" : "Oculto")</span></td>
+                            <td style="white-space:nowrap">
+                                <AppButton Href="@($"/admin/productos/{p.Id}")" Variant="ghost" Size="sm" IconOnly="true" AriaLabel="@($"Editar {p.Name}")"><Icon Name="pencil" Class="icon--sm" /></AppButton>
+                                <AppButton Href="@($"/producto/{p.Slug}")" Variant="ghost" Size="sm" IconOnly="true" AriaLabel="@($"Ver {p.Name} en la tienda")" target="_blank"><Icon Name="external" Class="icon--sm" /></AppButton>
+                                <AppButton Variant="ghost" Size="sm" OnClick="() => ToggleAsync(p)">@(p.IsActive ? "Ocultar" : "Publicar")</AppButton>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pagination CurrentPage="_result.Page" TotalPages="_result.TotalPages" UrlFor="@(page => Url(Q, F, page))" />
+    }
+</div>
+
+@code {
+    private PagedResult<AdminProductListItem>? _result;
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "f")] public string? F { get; set; }
+    [SupplyParameterFromQuery(Name = "p")] public int? P { get; set; }
+
+    private static readonly (string? Value, string Label)[] FilterOptions =
+    [
+        (null, "Todos"), ("active", "Visibles"), ("inactive", "Ocultos"), ("featured", "Destacados"), ("sale", "En oferta"), ("out", "Agotados")
+    ];
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        _result = await AdminCatalog.GetProductsAsync(new AdminQuery(Q, P ?? 1, 15, F));
+
+    private static string Url(string? q, string? f, int page)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(q)) parts.Add($"q={Uri.EscapeDataString(q)}");
+        if (f is not null) parts.Add($"f={f}");
+        if (page > 1) parts.Add($"p={page}");
+        return parts.Count == 0 ? "/admin/productos" : $"/admin/productos?{string.Join('&', parts)}";
+    }
+
+    private void SearchAsync(ChangeEventArgs e) => Navigation.NavigateTo(Url(e.Value?.ToString(), F, 1), replace: true);
+
+    private async Task ToggleAsync(AdminProductListItem p)
+    {
+        var result = await AdminCatalog.SetProductActiveAsync(p.Id, !p.IsActive);
+        if (result.Success) Toasts.Success(p.IsActive ? "Producto oculto" : "Producto publicado", p.Name);
+        else Toasts.Error("No se pudo actualizar", result.Error);
+        await LoadAsync();
+    }
+}

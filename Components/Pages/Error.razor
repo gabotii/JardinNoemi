@@ -1,0 +1,28 @@
+@page "/Error"
+@using System.Diagnostics
+
+<SeoHead Title="Error" Description="Ocurrió un error inesperado." NoIndex="true" />
+
+<div class="container status-page">
+    <span class="status-page__code" aria-hidden="true">Ups</span>
+    <h1 tabindex="-1">Algo salió mal</h1>
+    <p>Tuvimos un problema al procesar tu solicitud. Ya quedó registrado y lo revisaremos. Intenta nuevamente en unos minutos.</p>
+    @if (RequestId is not null)
+    {
+        <p class="small">Código de referencia: <code>@RequestId</code></p>
+    }
+    <div class="hero__actions" style="justify-content:center">
+        <AppButton Href="/" IconStart="home">Volver al inicio</AppButton>
+        <AppButton Href="/contacto" Variant="outline">Contactarnos</AppButton>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

@@ -1,0 +1,65 @@
+@* Paginación con enlaces reales (indexables y funcionales sin JavaScript). *@
+@if (TotalPages > 1)
+{
+    <nav class="pagination" aria-label="@Label">
+        <ul>
+            <li>
+                @if (CurrentPage > 1)
+                {
+                    <a href="@UrlFor(CurrentPage - 1)" aria-label="Página anterior" rel="prev"><Icon Name="chevron-left" Class="icon--sm" /></a>
+                }
+                else
+                {
+                    <span class="is-disabled" aria-hidden="true"><Icon Name="chevron-left" Class="icon--sm" /></span>
+                }
+            </li>
+            @foreach (var number in Pages())
+            {
+                <li>
+                    @if (number is null)
+                    {
+                        <span class="ellipsis" aria-hidden="true">…</span>
+                    }
+                    else if (number == CurrentPage)
+                    {
+                        <span aria-current="page">@number</span>
+                    }
+                    else
+                    {
+                        <a href="@UrlFor(number.Value)" aria-label="@($"Página {number}")">@number</a>
+                    }
+                </li>
+            }
+            <li>
+                @if (CurrentPage < TotalPages)
+                {
+                    <a href="@UrlFor(CurrentPage + 1)" aria-label="Página siguiente" rel="next"><Icon Name="chevron-right" Class="icon--sm" /></a>
+                }
+                else
+                {
+                    <span class="is-disabled" aria-hidden="true"><Icon Name="chevron-right" Class="icon--sm" /></span>
+                }
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter, EditorRequired] public Func<int, string> UrlFor { get; set; } = _ => "#";
+    [Parameter] public string Label { get; set; } = "Paginación";
+
+    /// <summary>1 … 4 5 6 … 12 (null representa los puntos suspensivos).</summary>
+    private IEnumerable<int?> Pages()
+    {
+        var set = new SortedSet<int> { 1, TotalPages, CurrentPage, CurrentPage - 1, CurrentPage + 1 };
+        int? previous = null;
+        foreach (var p in set.Where(p => p >= 1 && p <= TotalPages))
+        {
+            if (previous is not null && p - previous > 1) yield return null;
+            yield return p;
+            previous = p;
+        }
+    }
+}

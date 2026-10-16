@@ -1,0 +1,195 @@
+@page "/pedido/{OrderNumber}"
+@using System.Security.Claims
+@inject IOrderService Orders
+@inject AuthenticationStateProvider AuthState
+@inject IOptions<ShopOptions> Store
+@inject IOptionsMonitor<ShippingOptions> Shipping
+
+<SeoHead Title="Confirmación de pedido" Description="Detalle de tu pedido en JardinNoemi." NoIndex="true" />
+
+@if (!_loaded)
+{
+    <LoadingSpinner Center="true" Label="Cargando tu pedido…" />
+}
+else if (Order is null)
+{
+    <div class="container">
+        <EmptyState Icon="receipt" HeadingLevel="1" Title="No encontramos este pedido"
+                    Text="Revisa el enlace de tu correo de confirmación o ingresa a tu cuenta para ver tus pedidos.">
+            <Actions>
+                <AppButton Href="/cuenta/pedidos" IconStart="user">Mis pedidos</AppButton>
+                <AppButton Href="/" Variant="outline">Volver al inicio</AppButton>
+            </Actions>
+        </EmptyState>
+    </div>
+}
+else
+{
+    var o = Order;
+    var failed = o.PaymentStatus == PaymentStatus.Failed || o.Status == OrderStatus.Cancelled;
+    <div class="container confirmation">
+        <div class="confirmation__hero">
+            <span class="confirmation__check" aria-hidden="true"><Icon Name="@(failed ? "alert" : "check")" /></span>
+            @if (failed)
+            {
+                <h1 tabindex="-1">Este pedido fue cancelado</h1>
+                <p class="lead">El pago no se completó. Puedes volver a intentarlo desde la tienda.</p>
+            }
+            else
+            {
+                <h1 tabindex="-1">¡Gracias, @FirstName! @(o.PaymentStatus == PaymentStatus.AwaitingTransfer ? "Recibimos tu pedido" : "Tu pedido está confirmado")</h1>
+                <p class="lead">Tu pedido quedó registrado con el correo <strong>@o.Email</strong>. Guarda este número para cualquier consulta.</p>
+            }
+            <span class="confirmation__number">Pedido <strong>@o.OrderNumber</strong></span>
+        </div>
+
+        @if (o.PaymentStatus == PaymentStatus.AwaitingTransfer)
+        {
+            var bank = Store.Value.BankTransfer;
+            <div class="notice notice--warning" role="status" style="margin-bottom:var(--space-6)">
+                <Icon Name="bank" />
+                <div>
+                    <strong>Completa tu transferencia de @o.Total.ToMoney() dentro de @bank.HoldHours horas</strong>
+                    @bank.Bank · @bank.AccountType N° @bank.AccountNumber · Titular: @bank.Holder · RUT @bank.TaxId.
+                    Envía el comprobante a <a href="mailto:@bank.Email?subject=Pedido%20@o.OrderNumber">@bank.Email</a> indicando el número de pedido.
+                </div>
+            </div>
+        }
+
+        <div class="confirmation__grid">
+            <section class="summary-card" aria-labelledby="items-title">
+                <h2 id="items-title">Tu compra</h2>
+                <ul class="summary-items" aria-label="Productos comprados" style="max-height:none">
+                    @foreach (var line in o.Lines)
+                    {
+                        <li class="summary-item">
+                            <span class="summary-item__media">
+                                <img src="@(line.ImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="60" height="60" loading="lazy" />
+                                <span class="summary-item__qty">@line.Quantity</span>
+                            </span>
+                            <span>
+                                <a class="summary-item__name" href="/producto/@line.ProductSlug" style="text-decoration:none">@line.ProductName</a>
+                                <span class="small muted" style="display:block">@line.Quantity × @line.UnitPrice.ToMoney()</span>
+                            </span>
+                            <span class="summary-item__price">@line.LineTotal.ToMoney()</span>
+                        </li>
+                    }
+                </ul>
+                <dl class="summary-rows">
+                    <div class="summary-row"><dt>Subtotal</dt><dd>@o.Subtotal.ToMoney()</dd></div>
+                    <div class="summary-row"><dt>Envío</dt><dd>@(o.ShippingCost == 0 ? "Gratis" : o.ShippingCost.ToMoney())</dd></div>
+                    <div class="summary-row summary-row--total"><dt>Total</dt><dd>@o.Total.ToMoney()</dd></div>
+                </dl>
+            </section>
+
+            <div style="display:grid;gap:var(--space-6);align-content:start">
+                @if (!failed)
+                {
+                    <section class="summary-card" aria-labelledby="eta-title">
+                        <h2 id="eta-title">@(o.DeliveryMethod == DeliveryMethod.StorePickup ? "Retiro" : "Entrega estimada")</h2>
+                        <ol class="timeline">
+                            <li class="is-done"><span class="timeline__dot"><Icon Name="check" Class="icon--sm" /></span><div><strong>Pedido recibido</strong><span>@o.CreatedAt.ToLocalDateTime()</span></div></li>
+                            <li class="@(o.PaymentStatus == PaymentStatus.Paid ? "is-done" : null)"><span class="timeline__dot"><Icon Name="card" Class="icon--sm" /></span><div><strong>@OrderText.Payment(o.PaymentStatus)</strong><span>@OrderText.Method(o.PaymentMethod)</span></div></li>
+                            <li><span class="timeline__dot"><Icon Name="package" Class="icon--sm" /></span><div><strong>Preparación en el vivero</strong><span>Revisamos y embalamos cada planta a mano</span></div></li>
+                            <li>
+                                <span class="timeline__dot"><Icon Name="@(o.DeliveryMethod == DeliveryMethod.StorePickup ? "store" : "truck")" Class="icon--sm" /></span>
+                                <div>
+                                    <strong>@(o.DeliveryMethod == DeliveryMethod.StorePickup ? "Listo para retiro" : "Llega a tu casa")</strong>
+                                    <span>@EstimatedDelivery(o)</span>
+                                </div>
+                            </li>
+                        </ol>
+                    </section>
+                }
+
+                <section class="summary-card" aria-labelledby="info-title">
+                    <h2 id="info-title">Datos del pedido</h2>
+                    <dl class="info-list">
+                        <div><dt>Cliente</dt><dd>@o.CustomerName<br />@o.Email · @o.Phone</dd></div>
+                        <div>
+                            <dt>@OrderText.Delivery(o.DeliveryMethod)</dt>
+                            <dd>
+                                @if (o.ShippingAddress is { } a)
+                                {
+                                    @OrderText.AddressLine1(a)<br />@OrderText.AddressLine2(a)
+                                }
+                                else
+                                {
+                                    @Store.Value.Address
+                                }
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Pago</dt>
+                            <dd>
+                                @OrderText.Method(o.PaymentMethod) · <StatusPill Payment="o.PaymentStatus" />
+                                @if (o.PaymentProvider is not null)
+                                {
+                                    <br /><span class="small muted">@o.PaymentProvider@(o.PaymentReference is null ? "" : $" · Ref. {o.PaymentReference}")</span>
+                                }
+                            </dd>
+                        </div>
+                        @if (o.Notes is not null)
+                        {
+                            <div><dt>Notas</dt><dd>@o.Notes</dd></div>
+                        }
+                    </dl>
+                </section>
+
+                <div style="display:flex;flex-wrap:wrap;gap:var(--space-3)">
+                    <AppButton Href="/tienda" IconEnd="arrow-right">Seguir comprando</AppButton>
+                    <AppButton Href="/" Variant="outline" IconStart="home">Volver al inicio</AppButton>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loaded;
+
+    [Parameter] public string OrderNumber { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "token")] public string? Token { get; set; }
+
+    [PersistentState]
+    public OrderDetailDto? Order { get; set; }
+
+    private string FirstName => Order?.CustomerName.Split(' ', 2)[0] ?? string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Order?.OrderNumber == OrderNumber)
+        {
+            _loaded = true;
+            return;
+        }
+
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var userId = auth.User.Identity?.IsAuthenticated == true ? auth.User.FindFirstValue(ClaimTypes.NameIdentifier) : null;
+        var isAdmin = auth.User.IsInRole(JardinNoemi.Data.Roles.Admin);
+
+        Order = await Orders.GetOrderForViewerAsync(OrderNumber.ToUpperInvariant(), Token, userId, isAdmin);
+        _loaded = true;
+    }
+
+    private string EstimatedDelivery(OrderDetailDto o)
+    {
+        if (o.DeliveryMethod == DeliveryMethod.StorePickup)
+        {
+            return $"Desde el {AddBusinessDays(o.CreatedAt, 1).ToLocalDate()}";
+        }
+        var shipping = Shipping.CurrentValue;
+        return $"Entre el {AddBusinessDays(o.CreatedAt, shipping.EstimatedDaysMin).ToLocalDate()} y el {AddBusinessDays(o.CreatedAt, shipping.EstimatedDaysMax).ToLocalDate()}";
+    }
+
+    private static DateTime AddBusinessDays(DateTime start, int days)
+    {
+        var date = start;
+        while (days > 0)
+        {
+            date = date.AddDays(1);
+            if (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday) days--;
+        }
+        return date;
+    }
+}

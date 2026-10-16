@@ -1,0 +1,64 @@
+@inject CartState CartState
+@inject ToastService Toasts
+
+<li class="cart-line @(Large ? "cart-line--lg" : null)">
+    <a class="cart-line__media" href="/producto/@Line.Slug" tabindex="-1" aria-hidden="true">
+        <img src="@(Line.ImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="112" height="112" loading="lazy" />
+    </a>
+    <div class="cart-line__info">
+        <div class="cart-line__top">
+            <div>
+                <h3 class="cart-line__name"><a href="/producto/@Line.Slug">@Line.Name</a></h3>
+                <span class="cart-line__unit">@Line.UnitPrice.ToMoney() c/u</span>
+            </div>
+            <AppButton Variant="ghost" Size="sm" IconOnly="true" Class="cart-line__remove" Disabled="_busy"
+                       AriaLabel="@($"Quitar {Line.Name} del carrito")" OnClick="RemoveAsync">
+                <Icon Name="trash" Class="icon--sm" />
+            </AppButton>
+        </div>
+        @if (!Line.IsAvailable)
+        {
+            <span class="cart-line__warning" role="alert">Ya no está disponible. Quítalo para continuar.</span>
+        }
+        else if (Line.ExceedsStock)
+        {
+            <span class="cart-line__warning" role="alert">Solo quedan @Line.Stock unidades. Ajusta la cantidad.</span>
+        }
+        <div class="cart-line__bottom">
+            <QuantitySelector Value="Line.Quantity" ValueChanged="SetQuantityAsync" Min="1"
+                              Max="Math.Max(1, Math.Min(CartService.MaxQuantityPerLine, Line.Stock))"
+                              Disabled="_busy || !Line.IsAvailable" Small="!Large" ItemName="@Line.Name" />
+            <span class="cart-line__total">@Line.LineTotal.ToMoney()</span>
+        </div>
+    </div>
+</li>
+
+@code {
+    private bool _busy;
+
+    [Parameter, EditorRequired] public CartLineDto Line { get; set; } = default!;
+    [Parameter] public bool Large { get; set; }
+
+    private async Task SetQuantityAsync(int quantity)
+    {
+        _busy = true;
+        try
+        {
+            var result = await CartState.SetQuantityAsync(Line.ProductId, quantity);
+            if (!result.Success && result.Message is not null) Toasts.Warning("Cantidad ajustada", result.Message);
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task RemoveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var name = Line.Name;
+            var result = await CartState.RemoveAsync(Line.ProductId);
+            if (result.Success) Toasts.Info("Producto quitado", $"{name} salió de tu carrito.");
+        }
+        finally { _busy = false; }
+    }
+}

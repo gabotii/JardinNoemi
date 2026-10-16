@@ -1,0 +1,65 @@
+<div class="filter-panel">
+    <section class="filter-group" aria-labelledby="@($"{_id}-cat")">
+        <h3 id="@($"{_id}-cat")">Categorías</h3>
+        <ul class="filter-list">
+            <li>
+                <a href="@((Filters with { Category = null, Page = 1 }).ToUrl())" aria-current="@(Filters.Category is null ? "true" : null)">
+                    Toda la tienda <span class="count">@Categories.Sum(c => c.ProductCount)</span>
+                </a>
+            </li>
+            @foreach (var c in Categories)
+            {
+                <li>
+                    <a href="@((Filters with { Category = c.Slug, Page = 1 }).ToUrl())" aria-current="@(c.Slug == Filters.Category ? "true" : null)">
+                        @c.Name <span class="count">@c.ProductCount</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    </section>
+
+    <section class="filter-group" aria-labelledby="@($"{_id}-price")">
+        <h3 id="@($"{_id}-price")">Precio</h3>
+        <PriceFilter Min="Filters.MinPrice" Max="Filters.MaxPrice" OnApply="ApplyPrice" />
+    </section>
+
+    <section class="filter-group" aria-labelledby="@($"{_id}-more")">
+        <h3 id="@($"{_id}-more")">Preferencias</h3>
+        <label class="checkbox">
+            <input type="checkbox" checked="@Filters.OnSale" @onchange="e => ToggleAsync(f => f with { OnSale = IsChecked(e) })" />
+            En oferta
+        </label>
+        <label class="checkbox">
+            <input type="checkbox" checked="@Filters.InStock" @onchange="e => ToggleAsync(f => f with { InStock = IsChecked(e) })" />
+            Solo disponibles
+        </label>
+        <label class="checkbox">
+            <input type="checkbox" checked="@Filters.PetFriendly" @onchange="e => ToggleAsync(f => f with { PetFriendly = IsChecked(e) })" />
+            Seguras para mascotas
+        </label>
+    </section>
+
+    @if (Filters.HasActiveFilters)
+    {
+        <AppButton Variant="ghost" Size="sm" IconStart="x" OnClick="ClearAsync">Limpiar filtros</AppButton>
+    }
+</div>
+
+@code {
+    private readonly string _id = $"fp-{Guid.NewGuid():N}"[..11];
+
+    [Parameter, EditorRequired] public CatalogFilters Filters { get; set; } = new();
+    [Parameter, EditorRequired] public IReadOnlyList<CategoryDto> Categories { get; set; } = [];
+    [Parameter] public EventCallback<CatalogFilters> FiltersChanged { get; set; }
+
+    private static bool IsChecked(ChangeEventArgs e) => e.Value is true || e.Value?.ToString() == "true";
+
+    private Task ToggleAsync(Func<CatalogFilters, CatalogFilters> change) =>
+        FiltersChanged.InvokeAsync(change(Filters) with { Page = 1 });
+
+    private Task ApplyPrice((decimal? Min, decimal? Max) range) =>
+        FiltersChanged.InvokeAsync(Filters with { MinPrice = range.Min, MaxPrice = range.Max, Page = 1 });
+
+    private Task ClearAsync() =>
+        FiltersChanged.InvokeAsync(new CatalogFilters { Category = Filters.Category, Sort = Filters.Sort });
+}

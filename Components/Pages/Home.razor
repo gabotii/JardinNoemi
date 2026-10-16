@@ -1,0 +1,211 @@
+@page "/"
+@using System.Text.Json
+@inject ICatalogService Catalog
+@inject IOptions<ShopOptions> Store
+@inject IOptionsMonitor<ShippingOptions> Shipping
+
+<SeoHead Title="Plantas de interior, suculentas y regalos con vida"
+         Description="JardinNoemi es un vivero familiar en Santiago: plantas sanas y aclimatadas, macetas artesanales, terrarios y regalos con vida con despacho a todo Chile."
+         Canonical="/" JsonLd="@OrganizationJsonLd" />
+
+<section class="hero" aria-labelledby="hero-title">
+    <div class="container hero__inner">
+        <div>
+            <p class="eyebrow fade-up">Vivero urbano · Santiago de Chile</p>
+            <h1 id="hero-title" class="hero__title fade-up d1">Plantas con alma para <em>hogares con historia</em></h1>
+            <p class="hero__text fade-up d2">
+                Cultivamos, cuidamos y llevamos hasta tu puerta plantas sanas, macetas artesanales y regalos con vida.
+                Cada pedido incluye una guía de cuidados escrita por Noemí.
+            </p>
+            <div class="hero__actions fade-up d3">
+                <AppButton Href="/tienda" Size="lg" IconEnd="arrow-right">Explorar la tienda</AppButton>
+                <AppButton Href="/tienda/regalos" Size="lg" Variant="outline" IconStart="gift">Regalar una planta</AppButton>
+            </div>
+            <ul class="hero__proof fade-up d3" aria-label="Por qué confiar en nosotros">
+                <li><strong>4,9 / 5</strong><span>valoración promedio</span></li>
+                <li><strong>+2.500</strong><span>hogares con plantas nuestras</span></li>
+                <li><strong>7 días</strong><span>de garantía de llegada</span></li>
+            </ul>
+        </div>
+
+        <div class="hero__visual fade-up d2">
+            <div class="hero__arch">
+                <img src="/images/brand/hero.svg" alt="Monstera, sansevieria, potus y suculentas junto a una ventana en arco" width="1000" height="1000" fetchpriority="high" />
+            </div>
+            <div class="hero__float hero__float--b" aria-hidden="true">
+                <span class="hero__float-icon"><Icon Name="sprout" /></span>
+                <span><strong>Aclimatadas en vivero</strong>Listas para tu hogar</span>
+            </div>
+            <div class="hero__float hero__float--a" aria-hidden="true">
+                <span class="hero__float-icon"><Icon Name="truck" /></span>
+                <span><strong>Despacho gratis</strong>sobre @Shipping.CurrentValue.FreeShippingThreshold.ToMoney()</span>
+            </div>
+            <a class="hero__stamp" href="/tienda?oferta=true" aria-label="Ver productos en oferta">
+                <span>Hasta<b>-20%</b>ofertas</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="section" aria-labelledby="cats-title">
+    <div class="container">
+        <div class="section__header">
+            <div>
+                <p class="eyebrow">Explora</p>
+                <h2 id="cats-title">Encuentra tu próxima planta</h2>
+            </div>
+            <AppButton Href="/tienda" Variant="ghost" IconEnd="arrow-right">Ver toda la tienda</AppButton>
+        </div>
+        @if (Model is not null)
+        {
+            <ul role="list" class="category-grid">
+                @foreach (var category in Model.Categories)
+                {
+                    <li><CategoryCard Category="category" /></li>
+                }
+            </ul>
+        }
+    </div>
+</section>
+
+<section class="section section--sage" aria-labelledby="featured-title">
+    <div class="container">
+        <div class="section__header">
+            <div>
+                <p class="eyebrow">Favoritas de la comunidad</p>
+                <h2 id="featured-title">Las más queridas de la temporada</h2>
+            </div>
+            <AppButton Href="/tienda?orden=valoracion" Variant="ghost" IconEnd="arrow-right">Ver más</AppButton>
+        </div>
+        <ProductGrid Products="Model?.Featured" Loading="Model is null" SkeletonCount="8" FourColumns="true" Label="Productos destacados" />
+    </div>
+</section>
+
+<section class="section" aria-labelledby="why-title">
+    <div class="container">
+        <div class="section__header section__header--center">
+            <p class="eyebrow">¿Por qué JardinNoemi?</p>
+            <h2 id="why-title">Cuidamos cada planta como si fuera para nuestra casa</h2>
+        </div>
+        <ul role="list" class="benefits">
+            <li class="benefit">
+                <span class="benefit__icon"><Icon Name="sprout" /></span>
+                <h3>Plantas sanas y aclimatadas</h3>
+                <p>Cada planta pasa al menos dos semanas en nuestro vivero antes de viajar a tu casa.</p>
+            </li>
+            <li class="benefit">
+                <span class="benefit__icon"><Icon Name="truck" /></span>
+                <h3>Despacho cuidadoso</h3>
+                <p>Embalaje reutilizable y sin plástico, pensado para que lleguen erguidas y felices.</p>
+            </li>
+            <li class="benefit">
+                <span class="benefit__icon"><Icon Name="shield" /></span>
+                <h3>Garantía de llegada</h3>
+                <p>Si tu planta llega dañada, te enviamos otra sin costo dentro de los primeros 7 días.</p>
+            </li>
+            <li class="benefit">
+                <span class="benefit__icon"><Icon Name="message" /></span>
+                <h3>Asesoría de por vida</h3>
+                <p>¿Hojas amarillas? Escríbenos por WhatsApp y te ayudamos a diagnosticarla y cuidarla.</p>
+            </li>
+        </ul>
+    </div>
+</section>
+
+<section class="section section--tight" aria-labelledby="promo-title">
+    <div class="container">
+        <div class="promo">
+            <div class="promo__content">
+                <p class="eyebrow" style="color:var(--clay-600)">Temporada de primavera</p>
+                <h2 id="promo-title">Hasta 20% en terrarios, suculentas y regalos</h2>
+                <p>Mini ecosistemas y composiciones armadas a mano en nuestro taller. Precios marcados en la tienda, hasta agotar stock.</p>
+                <div class="hero__actions" style="margin-top:var(--space-6)">
+                    <AppButton Href="/tienda?oferta=true" Variant="accent" Size="lg" IconEnd="arrow-right">Ver ofertas</AppButton>
+                    <AppButton Href="/tienda/terrarios-y-kokedamas" Variant="ghost" Size="lg">Terrarios</AppButton>
+                </div>
+            </div>
+            <div class="promo__media">
+                <img src="/images/products/terrario-esfera-bosque-2.svg" alt="Terrario esfera con musgo y helechos" width="600" height="600" loading="lazy" />
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section" aria-labelledby="reviews-title">
+    <div class="container">
+        <div class="section__header">
+            <div>
+                @* Testimonios y cifras de ejemplo: reemplazar por reseñas reales antes de publicar. *@
+                <p class="eyebrow">Lo que dicen nuestros clientes</p>
+                <h2 id="reviews-title">Hogares más verdes, clientes felices</h2>
+            </div>
+            <StarRating Value="4.9" Count="1284" />
+        </div>
+        <div class="testimonials">
+            <figure class="testimonial">
+                <StarRating Value="5" ShowValue="false" />
+                <blockquote>Mi Monstera llegó impecable, con una nota escrita a mano y una guía de riego que de verdad entendí. Ya lleva dos hojas nuevas.</blockquote>
+                <figcaption><span class="avatar" aria-hidden="true">CR</span><div><strong>Camila R.</strong><span>Ñuñoa · Monstera Deliciosa</span></div></figcaption>
+            </figure>
+            <figure class="testimonial">
+                <StarRating Value="5" ShowValue="false" />
+                <blockquote>Regalé la Caja Primer Jardín a mi mamá y fue un éxito. El empaque es precioso y sin nada de plástico.</blockquote>
+                <figcaption><span class="avatar avatar--clay" aria-hidden="true">TG</span><div><strong>Tomás G.</strong><span>Viña del Mar · Caja regalo</span></div></figcaption>
+            </figure>
+            <figure class="testimonial">
+                <StarRating Value="4.8" ShowValue="false" />
+                <blockquote>Tenía miedo de que otra planta no sobreviviera conmigo. Noemí me respondió por WhatsApp en minutos y hoy mi helecho está enorme.</blockquote>
+                <figcaption><span class="avatar avatar--sand" aria-hidden="true">FP</span><div><strong>Fernanda P.</strong><span>Concepción · Helecho de Boston</span></div></figcaption>
+            </figure>
+        </div>
+    </div>
+</section>
+
+<section class="section section--tight" id="newsletter" aria-labelledby="nl-title" style="padding-bottom:var(--section-y)">
+    <div class="container">
+        <div class="newsletter-block">
+            <div>
+                <p class="eyebrow" style="color:var(--sage-300)">Cartas del jardín</p>
+                <h2 id="nl-title">Consejos de temporada directo a tu correo</h2>
+                <p>Guías de cuidado, lanzamientos y descuentos exclusivos. Una carta al mes, nada más.</p>
+            </div>
+            <NewsletterSignup Dark="true" />
+        </div>
+    </div>
+</section>
+
+@code {
+    [PersistentState]
+    public HomeModel? Model { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Durante el prerender se consulta la BD y el resultado se transfiere al circuito interactivo,
+        // evitando una segunda consulta al conectarse.
+        Model ??= new HomeModel(await Catalog.GetFeaturedAsync(8), await Catalog.GetCategoriesAsync());
+    }
+
+    private string OrganizationJsonLd
+    {
+        get
+        {
+            var s = Store.Value;
+            var baseUrl = s.BaseUrl.TrimEnd('/');
+            return JsonSerializer.Serialize(new Dictionary<string, object>
+            {
+                ["@context"] = "https://schema.org",
+                ["@type"] = "Store",
+                ["name"] = s.Name,
+                ["url"] = baseUrl,
+                ["logo"] = baseUrl + "/favicon.svg",
+                ["image"] = baseUrl + "/images/brand/og-image.png",
+                ["email"] = s.Email,
+                ["telephone"] = s.Phone,
+                ["address"] = new Dictionary<string, string> { ["@type"] = "PostalAddress", ["streetAddress"] = s.Address, ["addressCountry"] = "CL" },
+                ["sameAs"] = new[] { s.Instagram, s.Facebook, s.TikTok }
+            });
+        }
+    }
+
+    public sealed record HomeModel(IReadOnlyList<ProductCardDto> Featured, IReadOnlyList<CategoryDto> Categories);
+}

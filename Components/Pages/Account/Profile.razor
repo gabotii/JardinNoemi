@@ -1,0 +1,125 @@
+@page "/cuenta/perfil"
+@attribute [Authorize]
+@using System.Security.Claims
+@inject ICustomerService Customers
+@inject AuthenticationStateProvider AuthState
+@inject ToastService Toasts
+
+<SeoHead Title="Mi cuenta" Description="Tus datos en JardinNoemi." NoIndex="true" />
+
+<div class="page-hero">
+    <div class="container">
+        <Breadcrumbs Items="@([new("Mi cuenta")])" />
+        <h1 tabindex="-1">Hola@(_form.FirstName is { Length: > 0 } name ? $", {name}" : "")</h1>
+        <p class="lead">Mantén tus datos al día para que tus compras sean más rápidas.</p>
+    </div>
+</div>
+
+<div class="container account-layout">
+    <AccountNav />
+    <section class="card card--pad" aria-labelledby="profile-title">
+        @if (_email is null)
+        {
+            <LoadingSpinner Label="Cargando tus datos…" />
+        }
+        else
+        {
+            <h2 id="profile-title" style="font-size:var(--fs-xl)">Mis datos</h2>
+            <p class="small muted">Correo de la cuenta: <strong>@_email</strong></p>
+            <EditForm Model="_form" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <div class="form-grid">
+                    <div class="field span-3">
+                        <label class="field__label" for="p-first">Nombre</label>
+                        <InputText id="p-first" @bind-Value="_form.FirstName" autocomplete="given-name" />
+                        <ValidationMessage For="() => _form.FirstName" />
+                    </div>
+                    <div class="field span-3">
+                        <label class="field__label" for="p-last">Apellido</label>
+                        <InputText id="p-last" @bind-Value="_form.LastName" autocomplete="family-name" />
+                        <ValidationMessage For="() => _form.LastName" />
+                    </div>
+                    <div class="field span-3">
+                        <label class="field__label" for="p-phone">Teléfono</label>
+                        <InputText id="p-phone" type="tel" @bind-Value="_form.Phone" autocomplete="tel" />
+                        <ValidationMessage For="() => _form.Phone" />
+                    </div>
+                </div>
+
+                <h3 style="margin:var(--space-8) 0 var(--space-4);font-size:var(--fs-lg)">Dirección de despacho predeterminada</h3>
+                <div class="form-grid">
+                    <div class="field span-4">
+                        <label class="field__label" for="p-street">Dirección</label>
+                        <InputText id="p-street" @bind-Value="_form.Street" autocomplete="address-line1" />
+                    </div>
+                    <div class="field span-2">
+                        <label class="field__label" for="p-apt">Depto / Casa</label>
+                        <InputText id="p-apt" @bind-Value="_form.Apartment" autocomplete="address-line2" />
+                    </div>
+                    <div class="field span-2">
+                        <label class="field__label" for="p-city">Comuna</label>
+                        <InputText id="p-city" @bind-Value="_form.City" autocomplete="address-level2" />
+                    </div>
+                    <div class="field span-2">
+                        <label class="field__label" for="p-region">Región</label>
+                        <InputSelect id="p-region" @bind-Value="_form.Region">
+                            <option value="">Selecciona…</option>
+                            @foreach (var region in Regions.All)
+                            {
+                                <option value="@region">@region</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="field span-2">
+                        <label class="field__label" for="p-postal">Código postal</label>
+                        <InputText id="p-postal" @bind-Value="_form.PostalCode" autocomplete="postal-code" />
+                        <ValidationMessage For="() => _form.PostalCode" />
+                    </div>
+                    <div>
+                        <AppButton Type="submit" Loading="_saving" LoadingText="Guardando…" IconStart="check">Guardar cambios</AppButton>
+                    </div>
+                </div>
+            </EditForm>
+        }
+    </section>
+</div>
+
+@code {
+    private readonly ProfileForm _form = new();
+    private string? _userId;
+    private string? _email;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        _userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (_userId is null || await Customers.GetProfileAsync(_userId) is not { } profile) return;
+
+        _email = profile.Email;
+        _form.FirstName = profile.FirstName;
+        _form.LastName = profile.LastName;
+        _form.Phone = profile.Phone;
+        _form.Street = profile.Street;
+        _form.Apartment = profile.Apartment;
+        _form.City = profile.City;
+        _form.Region = profile.Region;
+        _form.PostalCode = profile.PostalCode;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_userId is null) return;
+        _saving = true;
+        try
+        {
+            var result = await Customers.UpdateProfileAsync(_userId, _form);
+            if (result.Success) Toasts.Success("Datos guardados", "Usaremos esta información en tu próxima compra.");
+            else Toasts.Error("No pudimos guardar", result.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -1,0 +1,70 @@
+@inherits LayoutComponentBase
+@inject CartState CartState
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<SvgSprites />
+<a class="skip-link" href="@SkipHref">Saltar al contenido</a>
+
+<div class="app-shell">
+    <AnnouncementBar />
+    <SiteHeader />
+    <main id="contenido" class="app-main" tabindex="-1">
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                @Body
+            </ChildContent>
+            <ErrorContent>
+                <div class="container">
+                    <EmptyState Icon="alert" Title="Algo no salió como esperábamos"
+                                Text="Tuvimos un problema al mostrar esta sección. Ya lo registramos; puedes intentarlo nuevamente.">
+                        <Actions>
+                            <AppButton OnClick="Recover" IconStart="refresh">Reintentar</AppButton>
+                            <AppButton Variant="outline" Href="/">Ir al inicio</AppButton>
+                        </Actions>
+                    </EmptyState>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
+    </main>
+    <SiteFooter />
+</div>
+
+@if (RendererInfo.IsInteractive)
+{
+    <CartDrawer />
+    <ToastHost />
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocurrió un error inesperado.
+    <a href="." class="reload">Recargar</a>
+    <span class="dismiss" role="button" aria-label="Cerrar">✕</span>
+</div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+
+    // Enlace de salto relativo a la página actual (evita que <base href="/"> lo convierta en "/#contenido").
+    private string SkipHref => $"{Navigation.ToBaseRelativePath(Navigation.Uri).Split('#')[0]}#contenido";
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            await CartState.EnsureInitializedAsync();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        CartState.CloseDrawer();
+        _errorBoundary?.Recover();
+    }
+
+    private void Recover() => _errorBoundary?.Recover();
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

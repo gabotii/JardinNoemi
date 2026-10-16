@@ -1,0 +1,169 @@
+@page "/admin/categorias"
+@inject IAdminCatalogService AdminCatalog
+@inject ToastService Toasts
+
+<AdminPageHeader Title="Categorías" Subtitle="Organiza la tienda y el menú de navegación.">
+    <Actions>
+        <AppButton IconStart="plus" Size="sm" OnClick="() => Edit(new CategoryEditModel { SortOrder = (_categories?.Count ?? 0) + 1 })">Nueva categoría</AppButton>
+    </Actions>
+</AdminPageHeader>
+
+<div class="admin-content">
+    @if (_categories is null)
+    {
+        <LoadingSpinner Center="true" />
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col" class="num">Orden</th>
+                        <th scope="col">Categoría</th>
+                        <th scope="col" class="num">Productos</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col"><span class="visually-hidden">Acciones</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _categories)
+                    {
+                        <tr @key="c.Id">
+                            <td class="num">@c.SortOrder</td>
+                            <td><strong>@c.Name</strong><br /><span class="small muted">/tienda/@c.Slug</span></td>
+                            <td class="num">@c.ProductCount</td>
+                            <td><span class="pill @(c.IsActive ? "pill--success" : "pill--neutral")">@(c.IsActive ? "Visible" : "Oculta")</span></td>
+                            <td style="white-space:nowrap">
+                                <AppButton Variant="ghost" Size="sm" IconStart="pencil" OnClick="() => Edit(Clone(c))">Editar</AppButton>
+                                <AppButton Variant="ghost" Size="sm" IconOnly="true" AriaLabel="@($"Eliminar {c.Name}")" Disabled="c.ProductCount > 0"
+                                           title="@(c.ProductCount > 0 ? "Tiene productos asociados" : "Eliminar")" OnClick="() => _toDelete = c">
+                                    <Icon Name="trash" Class="icon--sm" />
+                                </AppButton>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<Modal Title="@(_editing?.Id > 0 ? "Editar categoría" : "Nueva categoría")" IsOpen="_editing is not null" IsOpenChanged="open => { if (!open) _editing = null; }">
+    <ChildContent>
+    @if (_editing is not null)
+    {
+        <EditForm Model="_editing" OnValidSubmit="SaveAsync" id="category-form">
+            <DataAnnotationsValidator />
+            <div class="form-grid">
+                @if (_error is not null)
+                {
+                    <div class="notice notice--danger" role="alert"><Icon Name="alert" /><span>@_error</span></div>
+                }
+                <div class="field span-3">
+                    <label class="field__label" for="cat-name">Nombre</label>
+                    <InputText id="cat-name" @bind-Value="_editing.Name" @bind-Value:after="SuggestSlug" />
+                    <ValidationMessage For="() => _editing.Name" />
+                </div>
+                <div class="field span-3">
+                    <label class="field__label" for="cat-slug">Slug</label>
+                    <InputText id="cat-slug" @bind-Value="_editing.Slug" />
+                    <ValidationMessage For="() => _editing.Slug" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="cat-desc">Descripción</label>
+                    <InputTextArea id="cat-desc" @bind-Value="_editing.Description" rows="3" />
+                </div>
+                <div class="field span-4">
+                    <label class="field__label" for="cat-img">Imagen (URL)</label>
+                    <InputText id="cat-img" @bind-Value="_editing.ImageUrl" placeholder="/images/categories/..." />
+                </div>
+                <div class="field span-2">
+                    <label class="field__label" for="cat-order">Orden</label>
+                    <InputNumber id="cat-order" @bind-Value="_editing.SortOrder" />
+                </div>
+                <label class="checkbox"><InputCheckbox @bind-Value="_editing.IsActive" /> Visible en la tienda</label>
+            </div>
+        </EditForm>
+    }
+    </ChildContent>
+    <Footer>
+        <AppButton Variant="ghost" OnClick="() => _editing = null">Cancelar</AppButton>
+        <AppButton Type="submit" form="category-form" Loading="_saving" LoadingText="Guardando…">Guardar</AppButton>
+    </Footer>
+</Modal>
+
+<Modal Title="Eliminar categoría" IsOpen="_toDelete is not null" IsOpenChanged="open => { if (!open) _toDelete = null; }">
+    <ChildContent>
+        <p style="margin:0">¿Seguro que quieres eliminar <strong>@_toDelete?.Name</strong>? Esta acción no se puede deshacer.</p>
+    </ChildContent>
+    <Footer>
+        <AppButton Variant="ghost" OnClick="() => _toDelete = null">Cancelar</AppButton>
+        <AppButton Variant="danger" IconStart="trash" OnClick="DeleteAsync">Eliminar</AppButton>
+    </Footer>
+</Modal>
+
+@code {
+    private IReadOnlyList<CategoryEditModel>? _categories;
+    private CategoryEditModel? _editing;
+    private CategoryEditModel? _toDelete;
+    private bool _saving;
+    private string? _error;
+    private string? _autoSlug;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => _categories = await AdminCatalog.GetCategoriesAsync();
+
+    private void Edit(CategoryEditModel model)
+    {
+        _error = null;
+        _autoSlug = model.Id == 0 ? string.Empty : null;
+        _editing = model;
+    }
+
+    private static CategoryEditModel Clone(CategoryEditModel c) => new()
+    {
+        Id = c.Id, Name = c.Name, Slug = c.Slug, Description = c.Description, ImageUrl = c.ImageUrl,
+        SortOrder = c.SortOrder, IsActive = c.IsActive, ProductCount = c.ProductCount
+    };
+
+    private void SuggestSlug()
+    {
+        if (_editing is null || _autoSlug is null || (_editing.Slug.Length > 0 && _editing.Slug != _autoSlug)) return;
+        _editing.Slug = CatalogService.Slugify(_editing.Name);
+        _autoSlug = _editing.Slug;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_editing is null) return;
+        _saving = true;
+        try
+        {
+            var result = await AdminCatalog.SaveCategoryAsync(_editing);
+            if (!result.Success)
+            {
+                _error = result.Error;
+                return;
+            }
+            Toasts.Success("Categoría guardada", _editing.Name);
+            _editing = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_toDelete is null) return;
+        var result = await AdminCatalog.DeleteCategoryAsync(_toDelete.Id);
+        if (result.Success) Toasts.Success("Categoría eliminada", _toDelete.Name);
+        else Toasts.Error("No se pudo eliminar", result.Error);
+        _toDelete = null;
+        await LoadAsync();
+    }
+}

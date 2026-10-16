@@ -1,0 +1,25 @@
+<div class="summary-card">
+    <h2>Resumen del pedido</h2>
+    <ul class="summary-items" aria-label="Productos del pedido">
+        @foreach (var line in Lines)
+        {
+            <li class="summary-item">
+                <span class="summary-item__media">
+                    <img src="@(line.ImageUrl ?? "/images/brand/placeholder.svg")" alt="" width="60" height="60" loading="lazy" />
+                    <span class="summary-item__qty" aria-label="@($"{line.Quantity} unidades")">@line.Quantity</span>
+                </span>
+                <span class="summary-item__name">@line.Name</span>
+                <span class="summary-item__price">@line.LineTotal.ToMoney()</span>
+            </li>
+        }
+    </ul>
+    <CartSummary Subtotal="Subtotal" ItemCount="Lines.Sum(l => l.Quantity)" Quote="Quote" />
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CartLineDto> Lines { get; set; } = [];
+    [Parameter] public decimal Subtotal { get; set; }
+    [Parameter] public ShippingQuote? Quote { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

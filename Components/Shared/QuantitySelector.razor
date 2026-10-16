@@ -1,0 +1,31 @@
+<div class="qty @(Small ? "qty--sm" : null)" role="group" aria-label="@($"Cantidad de {ItemName}")">
+    <button type="button" aria-label="Disminuir cantidad" disabled="@(Disabled || Value <= Min)" @onclick="() => SetAsync(Value - 1)">
+        <Icon Name="minus" Class="icon--sm" />
+    </button>
+    <input type="number" inputmode="numeric" min="@Min" max="@Max" value="@Value" disabled="@Disabled"
+           aria-label="Cantidad" @onchange="OnInputChanged" />
+    <button type="button" aria-label="Aumentar cantidad" disabled="@(Disabled || Value >= Max)" @onclick="() => SetAsync(Value + 1)">
+        <Icon Name="plus" Class="icon--sm" />
+    </button>
+</div>
+
+@code {
+    [Parameter] public int Value { get; set; } = 1;
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public int Min { get; set; } = 1;
+    [Parameter] public int Max { get; set; } = 20;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Small { get; set; }
+    [Parameter] public string ItemName { get; set; } = "producto";
+
+    private async Task SetAsync(int value)
+    {
+        value = Math.Clamp(value, Min, Math.Max(Min, Max));
+        if (value == Value) return;
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    private Task OnInputChanged(ChangeEventArgs e) =>
+        int.TryParse(e.Value?.ToString(), out var parsed) ? SetAsync(parsed) : SetAsync(Value);
+}

@@ -1,0 +1,13 @@
+@page "/cuenta/acceso-denegado"
+
+<SeoHead Title="Acceso denegado" Description="No tienes permisos para ver esta página." NoIndex="true" />
+
+<div class="container">
+    <EmptyState Icon="lock" HeadingLevel="1" Title="Esta sección es privada"
+                Text="Tu cuenta no tiene permisos para ver esta página. Si crees que es un error, contáctanos.">
+        <Actions>
+            <AppButton Href="/" IconStart="home">Volver al inicio</AppButton>
+            <AppButton Href="/cuenta/perfil" Variant="outline">Mi cuenta</AppButton>
+        </Actions>
+    </EmptyState>
+</div>

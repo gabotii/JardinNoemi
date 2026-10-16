@@ -1,0 +1,69 @@
+@inject IOptions<ShopOptions> Options
+
+<footer class="site-footer">
+    <div class="container footer-top">
+        <div class="footer-brand">
+            <BrandLogo />
+            <p>
+                Un vivero familiar que cultiva, cuida y entrega plantas con cariño.
+                Te acompañamos desde que eliges tu planta hasta que la ves crecer.
+            </p>
+            <div class="social" aria-label="Redes sociales">
+                <a href="@Store.Instagram" target="_blank" rel="noopener noreferrer" aria-label="Instagram (se abre en otra pestaña)"><Icon Name="instagram" /></a>
+                <a href="@Store.Facebook" target="_blank" rel="noopener noreferrer" aria-label="Facebook (se abre en otra pestaña)"><Icon Name="facebook" /></a>
+                <a href="@Store.TikTok" target="_blank" rel="noopener noreferrer" aria-label="TikTok (se abre en otra pestaña)"><Icon Name="tiktok" /></a>
+                <a href="@($"https://wa.me/{Store.WhatsApp}")" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp (se abre en otra pestaña)"><Icon Name="message" /></a>
+            </div>
+        </div>
+
+        <nav class="footer-col" aria-labelledby="footer-shop">
+            <h2 id="footer-shop">Tienda</h2>
+            <ul>
+                <li><a href="/tienda">Todos los productos</a></li>
+                <li><a href="/tienda/plantas-de-interior">Plantas de interior</a></li>
+                <li><a href="/tienda/suculentas-y-cactus">Suculentas y cactus</a></li>
+                <li><a href="/tienda/terrarios-y-kokedamas">Terrarios y kokedamas</a></li>
+                <li><a href="/tienda/regalos">Regalos con vida</a></li>
+                <li><a href="/tienda?oferta=true">Ofertas</a></li>
+            </ul>
+        </nav>
+
+        <nav class="footer-col" aria-labelledby="footer-help">
+            <h2 id="footer-help">Ayuda</h2>
+            <ul>
+                <li><a href="/politicas/envios">Envíos y retiros</a></li>
+                <li><a href="/politicas/devoluciones">Cambios y devoluciones</a></li>
+                <li><a href="/politicas/privacidad">Privacidad</a></li>
+                <li><a href="/politicas/terminos">Términos y condiciones</a></li>
+                <li><a href="/nosotros">Nuestra historia</a></li>
+                <li><a href="/contacto">Contacto</a></li>
+            </ul>
+        </nav>
+
+        <div class="footer-col footer-newsletter">
+            <h2>Contacto</h2>
+            <ul class="footer-contact" style="margin-bottom:var(--space-6)">
+                <li><Icon Name="mail" /><a href="mailto:@Store.Email">@Store.Email</a></li>
+                <li><Icon Name="phone" /><a href="tel:@Store.Phone.Replace(" ", "")">@Store.Phone</a></li>
+                <li><Icon Name="map-pin" /><span>@Store.Address</span></li>
+                <li><Icon Name="clock" /><span>@Store.OpeningHours</span></li>
+            </ul>
+            <h2>Cartas del jardín</h2>
+            <p>Consejos de cuidado, lanzamientos y descuentos exclusivos. Una vez al mes, sin spam.</p>
+            <NewsletterSignup Dark="true" />
+        </div>
+    </div>
+
+    <div class="container footer-bottom">
+        <p style="margin:0">© @DateTime.Now.Year @Store.LegalName. Hecho con cariño en Chile.</p>
+        <ul aria-label="Medios de pago">
+            <li class="payment-marks">
+                <span>Visa</span><span>Mastercard</span><span>Débito</span><span>Transferencia</span>
+            </li>
+        </ul>
+    </div>
+</footer>
+
+@code {
+    private ShopOptions Store => Options.Value;
+}
