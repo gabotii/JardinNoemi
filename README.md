@@ -90,3 +90,6 @@ historia en "Nosotros", datos bancarios y contacto son de ejemplo.
 - Persistir las claves de Data Protection (protegen cookies y el id del carrito) en almacenamiento compartido.
 - Pasarela real: implementa `IPaymentGateway` (Stripe, Mercado Pago, Webpay, PayPal) con tokenización en el navegador y
   registra la implementación en `Program.cs` en lugar de `MockPaymentGateway`; confirma pagos con webhooks.
+
+![Uploading image.png…]()
+
